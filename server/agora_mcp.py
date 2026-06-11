@@ -9,7 +9,7 @@ Run remote (HTTP, required for claude.ai web connectors):
 Every connected surface that points at the SAME workspace shares one room.
 """
 from __future__ import annotations
-import argparse, json, os
+import argparse, hmac, json, os
 from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
@@ -255,7 +255,7 @@ def main():
             class BearerAuthMiddleware(BaseHTTPMiddleware):
                 async def dispatch(self, request, call_next):
                     auth = request.headers.get("Authorization", "")
-                    if auth != f"Bearer {token}":
+                    if not hmac.compare_digest(auth, f"Bearer {token}"):
                         return JSONResponse({"error": "unauthorized"}, status_code=401)
                     return await call_next(request)
 

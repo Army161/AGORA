@@ -2,7 +2,7 @@
   "mcpServers": {
     "agora": {
       "command": "python3",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/server/agora_mcp.py", "--workspace", "./.agora", "--name", "Agora"],
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/agora_mcp.py", "--workspace", "${AGORA_WORKSPACE:-${HOME}/.agora/main}", "--name", "Agora"],
       "env": {}
     }
   }

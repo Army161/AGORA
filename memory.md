@@ -35,11 +35,27 @@
   UPDATES.md + H-0001.md all written; all 6 event kinds present in log.
 - Pushed to GitHub: army161/superpowers branch claude/lucid-gauss-xrb545 (waiting for repo).
 
+## Turn 8 — security hardening + wiring helpers (claude/youthful-cori-lzynnd)
+- Patched token comparison: `hmac.compare_digest` in bridge.py + agora_mcp.py (was plain
+  string ==, which is timing-side-channel vulnerable). Vendored plugin/server synced.
+- plugin/.mcp.json updated: workspace is now `${AGORA_WORKSPACE:-${HOME}/.agora/main}`
+  so all surfaces share one path once the env var is set.
+- Added setup.sh (generates token, creates workspace, starts bridge) and
+  start-web-connector.sh (HTTP mode with HTTPS tunnel instructions) and
+  desktop-mcp-config.json (Claude Desktop wiring snippet).
+- Phase 7 acceptance test re-verified: PASSED (all 6 event kinds present).
+
 ## Remaining (needs user action on real machine)
-- **Wire real app configs** (ask before touching MCP config files).
-- **HTTPS + claude.ai connector**: run `agora_mcp.py --http --token <tok>`, expose via
-  tunnel (cloudflare/ngrok/fly), register as Custom Connector in claude.ai settings.
-- **Live cross-surface test** with ≥2 real surfaces on the same workspace.
+- Set `export AGORA_WORKSPACE="$HOME/.agora/<your-project>"` and
+  `export AGORA_TOKEN="$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')"`.
+- Run `bash setup.sh` to smoke-test the bridge (opens localhost:8849).
+- Wire Claude Code: install the plugin (see plugin/README.md).
+- Wire Claude Desktop/Cowork: fill in absolute paths in desktop-mcp-config.json and
+  merge the `agora` block into the desktop MCP config file, then restart the app.
+- Wire claude.ai web: run `bash start-web-connector.sh`, expose port 8848 over HTTPS
+  (cloudflared/ngrok), register as Custom Connector in claude.ai Settings → Connectors.
+- Install skill/agora/SKILL.md as a custom skill on claude.ai / Cowork.
+- Run the Phase 7 live acceptance test (two real surfaces, same workspace).
 
 ## Turn 2 — built Claude Code plugin (local hub + ./.agora chosen by user)
 - plugin/: plugin.json, .mcp.json (server via ${CLAUDE_PLUGIN_ROOT}, workspace ./.agora),

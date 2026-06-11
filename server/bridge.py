@@ -11,7 +11,7 @@ Then open http://localhost:8849  (or open the standalone dashboard; it auto-dete
 Read-only by default? No — it performs coordination writes via the store. Add an auth
 token before exposing it beyond localhost (see HANDOFF.md).
 """
-import argparse, json, os, sys, time
+import argparse, hmac, json, os, sys, time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -171,7 +171,7 @@ class H(BaseHTTPRequestHandler):
         if not TOKEN:
             return True
         auth = self.headers.get("Authorization", "")
-        return auth == f"Bearer {TOKEN}"
+        return hmac.compare_digest(auth, f"Bearer {TOKEN}")
     def log_message(self, *a):
         pass
     def do_OPTIONS(self):
