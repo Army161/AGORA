@@ -9,7 +9,7 @@ Run remote (HTTP, required for claude.ai web connectors):
 Every connected surface that points at the SAME workspace shares one room.
 """
 from __future__ import annotations
-import argparse, json, os
+import argparse, hmac, json, os
 from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
@@ -27,6 +27,10 @@ def _store() -> AgoraStore:
     return STORE
 
 def _j(obj) -> str: return json.dumps(obj, indent=2, default=str)
+
+def _is_loopback(host: str) -> bool:
+    """True only for hosts that are unreachable from other machines."""
+    return host in ("127.0.0.1", "localhost", "::1", "")
 
 class Surface(str, Enum):
     claude_ai = "claude_ai"; cowork = "cowork"; claude_code = "claude_code"
@@ -243,9 +247,15 @@ def main():
     args = ap.parse_args()
     STORE = AgoraStore(args.workspace, args.name)
     if args.http:
+        token = args.token or None
+        # Refuse to start exposed-but-open: a non-loopback bind without a token
+        # would silently serve the room to anyone who can reach the port.
+        if token is None and not _is_loopback(args.host):
+            ap.error(f"refusing to bind {args.host} without a token. "
+                     f"Set AGORA_TOKEN (or --token) before exposing beyond localhost, "
+                     f"or bind --host 127.0.0.1 for local-only use.")
         mcp.settings.host = args.host
         mcp.settings.port = args.port
-        token = args.token or None
         if token:
             # Wrap the ASGI app with a simple bearer-token middleware.
             import uvicorn
@@ -255,7 +265,7 @@ def main():
             class BearerAuthMiddleware(BaseHTTPMiddleware):
                 async def dispatch(self, request, call_next):
                     auth = request.headers.get("Authorization", "")
-                    if auth != f"Bearer {token}":
+                    if not hmac.compare_digest(auth, f"Bearer {token}"):
                         return JSONResponse({"error": "unauthorized"}, status_code=401)
                     return await call_next(request)
 

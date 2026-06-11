@@ -11,7 +11,7 @@ Then open http://localhost:8849  (or open the standalone dashboard; it auto-dete
 Read-only by default? No — it performs coordination writes via the store. Add an auth
 token before exposing it beyond localhost (see HANDOFF.md).
 """
-import argparse, json, os, sys, time
+import argparse, hmac, json, os, sys, time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,6 +20,10 @@ from store import AgoraStore
 STORE = None
 DASHBOARD = None
 TOKEN = None   # set via --token; if set, /state and /act require Authorization: Bearer <token>
+
+def _is_loopback(host):
+    """True only for hosts that are unreachable from other machines."""
+    return host in ("127.0.0.1", "localhost", "::1", "")
 SETTINGS_DEFAULT = {
     "theme": "dark", "density": "comfortable", "autoroute": True,
     "rules": [
@@ -171,7 +175,7 @@ class H(BaseHTTPRequestHandler):
         if not TOKEN:
             return True
         auth = self.headers.get("Authorization", "")
-        return auth == f"Bearer {TOKEN}"
+        return hmac.compare_digest(auth, f"Bearer {TOKEN}")
     def log_message(self, *a):
         pass
     def do_OPTIONS(self):
@@ -244,6 +248,12 @@ def main():
                          "Can also be set via AGORA_TOKEN env var.")
     args = ap.parse_args()
     TOKEN = args.token or None
+    # Refuse to start exposed-but-open: a non-loopback bind without a token
+    # would silently serve /state and /act to anyone who can reach the port.
+    if TOKEN is None and not _is_loopback(args.host):
+        ap.error(f"refusing to bind {args.host} without a token. "
+                 f"Set AGORA_TOKEN (or --token) before exposing beyond localhost, "
+                 f"or bind --host 127.0.0.1 for local-only use.")
     STORE = AgoraStore(args.workspace, args.name)
     STORE._ensure_safe()
     DASHBOARD = os.path.abspath(args.dashboard) if args.dashboard and os.path.exists(args.dashboard) else None
