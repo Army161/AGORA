@@ -7,7 +7,7 @@ set -e
 : "${AGORA_WORKSPACE:?'Set AGORA_WORKSPACE first, e.g. export AGORA_WORKSPACE=$HOME/.agora/main'}"
 : "${AGORA_TOKEN:?'Set AGORA_TOKEN first. Generate one: python3 -c \"import secrets; print(secrets.token_urlsafe(32))\"'}"
 
-REPO_DIR="$(dirname "$(realpath "$0")")"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Starting Agora MCP HTTP server …"
 echo "  Workspace : $AGORA_WORKSPACE"

@@ -1,6 +1,7 @@
 {
-  "_comment": "Paste the 'agora' block into your Claude Desktop mcpServers config.",
-  "_comment2": "Set AGORA_WORKSPACE before opening Claude Desktop, or replace the placeholder.",
+  "_comment": "Paste only the 'agora' block into your Claude Desktop mcpServers config.",
+  "_comment2": "Replace BOTH placeholder paths below with the same absolute path on your machine.",
+  "_comment3": "Windows: use 'python' instead of 'python3' if python3 is not on your PATH.",
   "_desktop_config_paths": {
     "macOS":   "~/Library/Application Support/Claude/claude_desktop_config.json",
     "Windows": "%APPDATA%\\Claude\\claude_desktop_config.json",
@@ -13,10 +14,7 @@
         "/ABSOLUTE/PATH/TO/AGORA/server/agora_mcp.py",
         "--workspace",
         "/ABSOLUTE/PATH/TO/.agora/main"
-      ],
-      "env": {
-        "AGORA_WORKSPACE": "/ABSOLUTE/PATH/TO/.agora/main"
-      }
+      ]
     }
   }
 }

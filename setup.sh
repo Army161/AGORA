@@ -19,7 +19,7 @@ fi
 export AGORA_WORKSPACE AGORA_TOKEN
 
 # ── 3. Dependencies ──────────────────────────────────────────────────────────
-pip install -q -r "$(dirname "$0")/server/requirements.txt"
+python3 -m pip install -q -r "$(dirname "$0")/server/requirements.txt"
 
 # ── 4. Smoke-test the bridge ─────────────────────────────────────────────────
 echo "Starting bridge on http://localhost:8849 …"
