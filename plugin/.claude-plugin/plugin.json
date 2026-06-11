@@ -1,0 +1,6 @@
+{
+  "name": "agora",
+  "version": "0.1.0",
+  "description": "Shared workspace where Claude Code, Cowork, Desktop, Chrome and Design coordinate: handoffs, updates, leased tasks, file locks, and a live board.",
+  "author": { "name": "Agora" }
+}
