@@ -33,10 +33,12 @@
 - [x] Bearer-token auth added to bridge.py (--token / AGORA_TOKEN; /state + /act gated)
 - [x] Bearer-token auth added to agora_mcp.py HTTP mode (--token; Starlette middleware)
 - [x] Constant-time compare (hmac.compare_digest) in bridge.py + agora_mcp.py + vendored copies
-- [x] plugin/.mcp.json updated to use $AGORA_WORKSPACE (fallback ~/.agora/main)
-- [x] setup.sh — generates token, creates workspace dir, starts bridge
-- [x] start-web-connector.sh — starts MCP HTTP server for HTTPS/claude.ai path
-- [x] desktop-mcp-config.json — Claude Desktop wiring snippet
+- [x] Refuse-to-start guard: non-loopback bind without token → ap.error exit 2 (both servers)
+- [x] plugin/.mcp.json updated to set AGORA_WORKSPACE via env block (no unsupported bash syntax)
+- [x] setup.sh — generates token, creates workspace dir, starts bridge (python3 -m pip)
+- [x] start-web-connector.sh — starts MCP HTTP server for HTTPS/claude.ai path (portable cd&&pwd)
+- [x] desktop-mcp-config.json — Claude Desktop wiring snippet (Windows python note)
+- [x] PR #1 reviews addressed (Kilo: merge; Augment: 5 findings fixed)
 - [ ] HTTPS run + tunnel/host (user action: expose with cloudflare tunnel or ngrok)
 - [ ] claude.ai custom connector registration (user action: paste HTTPS URL into claude.ai settings)
 

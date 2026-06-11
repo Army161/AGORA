@@ -66,3 +66,17 @@
 - Phase 7 acceptance test PASSED: A join+add+claim; B join+board+refuse-claim+create-handoff;
   A list+ack+complete; board.md + UPDATES.md + H-0001.md verified; all 6 event kinds present.
 - Updated memory.md / todolist.md / build.md. Next: HTTPS tunnel + real surface wiring (user).
+
+## Turn 8 (Claude Code — security hardening + wiring helpers, PR #1)
+- Replaced plain `==` token compare with `hmac.compare_digest` in bridge.py + agora_mcp.py
+  (timing-side-channel fix). Vendored plugin/server synced.
+- Added refuse-to-start guard: both servers `ap.error()` (exit 2) if bound to a non-loopback
+  host without a token. `_is_loopback()` helper treats 127.0.0.1/localhost/::1/"" as safe.
+  Verified: 0.0.0.0 no-token → refused; 127.0.0.1 no-token → starts; 0.0.0.0 +token → starts.
+- plugin/.mcp.json: dropped unsupported bash `:-` default; workspace via AGORA_WORKSPACE env block.
+- Added setup.sh (token gen + workspace + bridge), start-web-connector.sh (HTTP/HTTPS path,
+  portable `cd && pwd` instead of realpath), desktop-mcp-config.json (Desktop snippet).
+- setup.sh uses `python3 -m pip` (correct interpreter).
+- Reviews: Kilo = No Issues/Merge; Augment = 5 findings, all fixed.
+- Phase 7 acceptance test re-run: PASSED. py_compile clean on all 4 server files.
+- Remaining (user machine): merge PR #1, then live cross-surface test + HTTPS connector.

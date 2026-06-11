@@ -28,6 +28,10 @@ def _store() -> AgoraStore:
 
 def _j(obj) -> str: return json.dumps(obj, indent=2, default=str)
 
+def _is_loopback(host: str) -> bool:
+    """True only for hosts that are unreachable from other machines."""
+    return host in ("127.0.0.1", "localhost", "::1", "")
+
 class Surface(str, Enum):
     claude_ai = "claude_ai"; cowork = "cowork"; claude_code = "claude_code"
     chrome = "chrome"; design = "design"; other = "other"
@@ -243,9 +247,15 @@ def main():
     args = ap.parse_args()
     STORE = AgoraStore(args.workspace, args.name)
     if args.http:
+        token = args.token or None
+        # Refuse to start exposed-but-open: a non-loopback bind without a token
+        # would silently serve the room to anyone who can reach the port.
+        if token is None and not _is_loopback(args.host):
+            ap.error(f"refusing to bind {args.host} without a token. "
+                     f"Set AGORA_TOKEN (or --token) before exposing beyond localhost, "
+                     f"or bind --host 127.0.0.1 for local-only use.")
         mcp.settings.host = args.host
         mcp.settings.port = args.port
-        token = args.token or None
         if token:
             # Wrap the ASGI app with a simple bearer-token middleware.
             import uvicorn

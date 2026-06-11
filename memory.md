@@ -35,15 +35,20 @@
   UPDATES.md + H-0001.md all written; all 6 event kinds present in log.
 - Pushed to GitHub: army161/superpowers branch claude/lucid-gauss-xrb545 (waiting for repo).
 
-## Turn 8 — security hardening + wiring helpers (claude/youthful-cori-lzynnd)
+## Turn 8 — security hardening + wiring helpers (PR #1, claude/youthful-cori-lzynnd)
 - Patched token comparison: `hmac.compare_digest` in bridge.py + agora_mcp.py (was plain
   string ==, which is timing-side-channel vulnerable). Vendored plugin/server synced.
-- plugin/.mcp.json updated: workspace is now `${AGORA_WORKSPACE:-${HOME}/.agora/main}`
-  so all surfaces share one path once the env var is set.
-- Added setup.sh (generates token, creates workspace, starts bridge) and
-  start-web-connector.sh (HTTP mode with HTTPS tunnel instructions) and
+- AUTH GATE: both servers now REFUSE TO START (ap.error, exit 2) if bound to a non-loopback
+  host without a token. `_is_loopback()` = 127.0.0.1/localhost/::1/"". So no silent open
+  exposure: 0.0.0.0 + no token → refused; localhost + no token → ok; 0.0.0.0 + token → ok.
+- plugin/.mcp.json: dropped unsupported bash `:-` default; workspace via AGORA_WORKSPACE env block.
+- Added setup.sh (generates token via secrets.token_urlsafe(32), creates workspace, runs bridge),
+  start-web-connector.sh (HTTP/HTTPS path, portable cd&&pwd not realpath, requires token),
   desktop-mcp-config.json (Claude Desktop wiring snippet).
-- Phase 7 acceptance test re-verified: PASSED (all 6 event kinds present).
+- Reviews on PR #1: Kilo Code = No Issues/Merge; Augment = 5 findings, all fixed (mcp.json
+  bash syntax, realpath, desktop env mismatch, Windows python3, bare pip).
+- Phase 7 acceptance test re-verified after each change: PASSED (all 6 event kinds present).
+- PR #1 open: https://github.com/Army161/AGORA/pull/1 — ready to squash-merge.
 
 ## Remaining (needs user action on real machine)
 - Set `export AGORA_WORKSPACE="$HOME/.agora/<your-project>"` and
