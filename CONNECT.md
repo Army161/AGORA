@@ -1,10 +1,25 @@
 # Connecting the 5 surfaces to one Agora room (local hub)
 
+## Fastest path: one command for the two local surfaces
+On the machine that has Claude Code + Claude Desktop, from inside this repo:
+```bash
+bash wire-local.sh                 # uses ~/.agora/main
+# or: bash wire-local.sh ~/.agora/landing-redesign   # name your own room
+```
+It resolves ONE literal absolute path, writes that identical string into both the
+Claude Desktop config and Claude Code (`claude mcp add`), backs up anything it touches,
+and verifies both surfaces resolve to the same room. Preview without writing:
+`bash wire-local.sh --print`. Then restart Desktop, run `/agora-board` in Code, and do
+the "Verify the room" steps below. The rest of this file is the manual/per-surface guide.
+
 ## The one golden rule
 Every surface must point at the **same workspace folder**. Because surfaces start from
 different places, use an **absolute path**, e.g. `/Users/you/projects/myproject/.agora`
 (call it `$WS` below). The engine is cross-process safe — several surfaces can run their
 own server against the same folder at once; the mutex + atomic writes keep it clean.
+Use the **literal** absolute string everywhere — no `~`, no `$HOME` inside JSON config —
+or one surface lands in a different room and nothing appears to sync. `wire-local.sh`
+exists precisely to make that impossible.
 
 One-time on the machine that holds the folder:
 ```bash

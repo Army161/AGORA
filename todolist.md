@@ -44,4 +44,7 @@
 
 ## Phase 7 — Live cross-surface test
 - [x] Acceptance test script passes locally (store-level): join/claim/refuse/handoff/ack/done + all events
-- [ ] Live test on real machine with ≥2 real surfaces + dashboard visible
+- [x] wire-local.sh — one command wires Claude Code + Desktop to ONE literal path, verified equal
+- [ ] User runs wire-local.sh on real machine, restarts Desktop, /agora-board in Code
+- [ ] Live two-surface test: claim in one → refused in other → handoff → done (paste result)
+- [ ] Then add claude.ai web (start-web-connector.sh + HTTPS + Custom Connector) for full 5-surface run

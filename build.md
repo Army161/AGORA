@@ -80,3 +80,18 @@
 - Reviews: Kilo = No Issues/Merge; Augment = 5 findings, all fixed.
 - Phase 7 acceptance test re-run: PASSED. py_compile clean on all 4 server files.
 - Remaining (user machine): merge PR #1, then live cross-surface test + HTTPS connector.
+
+## Turn 9 (Claude Code — wire-local.sh: one-command local wiring)
+- Built wire-local.sh: resolves ONE literal absolute workspace path (pwd -P, no ~/$VAR),
+  writes identical --workspace string into BOTH Claude Desktop (JSON merge, backup first,
+  preserves existing servers) and Claude Code (claude mcp add -s user), then verifies both
+  resolve to the same room. Modes: default write, --print, --dry-run; OS-detects Desktop
+  config path (macOS/Linux/Windows); picks python3 or python.
+- Kills the path-drift footgun (plugin env block vs desktop --workspace arg were two
+  different mechanisms). Now one source string, verified equal.
+- Tested in sandboxed HOME: merge preserved globalShortcut + existing filesystem server;
+  claude mcp add ran + verified; backup written. All green.
+- CONNECT.md: added "Fastest path: one command" section + literal-path warning.
+- Generated a live preview of the cross-surface claim→refuse→handoff (verbatim refusal:
+  "task T-0001 is owned by claude-code until ... Use force=true to override.").
+- Branch note: no origin/main; claude/lucid-gauss-xrb545 is source of truth (PR #1 merged).
