@@ -35,6 +35,20 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SERVER="$REPO_DIR/server/agora_mcp.py"
 [ -f "$SERVER" ] || { echo "ERROR: $SERVER not found — run this from inside the AGORA repo." >&2; exit 1; }
 
+# On Git Bash / MSYS / Cygwin, `pwd -P` yields POSIX paths (/c/...) that native
+# Windows Python and Claude Desktop can't resolve. Convert to Windows-native form.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    if command -v cygpath >/dev/null 2>&1; then
+      WS="$(cygpath -w "$WS")"
+      SERVER="$(cygpath -w "$SERVER")"
+    else
+      echo "WARNING: on a Windows shell but 'cygpath' not found — the written paths" >&2
+      echo "         may be POSIX-style (/c/...) and unusable by native Windows apps." >&2
+    fi
+    ;;
+esac
+
 # ── Pick a Python that exists on this machine ─────────────────────────────────
 if command -v python3 >/dev/null 2>&1; then PY="python3"
 elif command -v python >/dev/null 2>&1;  then PY="python"

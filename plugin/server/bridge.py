@@ -22,8 +22,9 @@ DASHBOARD = None
 TOKEN = None   # set via --token; if set, /state and /act require Authorization: Bearer <token>
 
 def _is_loopback(host):
-    """True only for hosts that are unreachable from other machines."""
-    return host in ("127.0.0.1", "localhost", "::1", "")
+    """True only for hosts that are unreachable from other machines.
+    Note: "" / "0.0.0.0" / "::" bind to ALL interfaces — never loopback."""
+    return host in ("127.0.0.1", "localhost", "::1")
 SETTINGS_DEFAULT = {
     "theme": "dark", "density": "comfortable", "autoroute": True,
     "rules": [
@@ -247,6 +248,10 @@ def main():
                     help="Bearer token for /state and /act. Required when exposed beyond localhost. "
                          "Can also be set via AGORA_TOKEN env var.")
     args = ap.parse_args()
+    if "/ABSOLUTE/PATH/TO" in args.workspace:
+        ap.error(f"workspace path is an unedited placeholder ({args.workspace}). "
+                 f"Set a real absolute path via --workspace or AGORA_WORKSPACE "
+                 f"(or run wire-local.sh).")
     TOKEN = args.token or None
     # Refuse to start exposed-but-open: a non-loopback bind without a token
     # would silently serve /state and /act to anyone who can reach the port.
