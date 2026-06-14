@@ -29,8 +29,9 @@ def _store() -> AgoraStore:
 def _j(obj) -> str: return json.dumps(obj, indent=2, default=str)
 
 def _is_loopback(host: str) -> bool:
-    """True only for hosts that are unreachable from other machines."""
-    return host in ("127.0.0.1", "localhost", "::1", "")
+    """True only for hosts that are unreachable from other machines.
+    Note: "" / "0.0.0.0" / "::" bind to ALL interfaces — never loopback."""
+    return host in ("127.0.0.1", "localhost", "::1")
 
 class Surface(str, Enum):
     claude_ai = "claude_ai"; cowork = "cowork"; claude_code = "claude_code"
@@ -245,6 +246,10 @@ def main():
                     help="Bearer token for HTTP mode. Required when exposed beyond localhost. "
                          "Can also be set via AGORA_TOKEN env var.")
     args = ap.parse_args()
+    if "/ABSOLUTE/PATH/TO" in args.workspace:
+        ap.error(f"workspace path is an unedited placeholder ({args.workspace}). "
+                 f"Set a real absolute path via --workspace or AGORA_WORKSPACE "
+                 f"(or run wire-local.sh).")
     STORE = AgoraStore(args.workspace, args.name)
     if args.http:
         token = args.token or None

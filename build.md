@@ -80,3 +80,41 @@
 - Reviews: Kilo = No Issues/Merge; Augment = 5 findings, all fixed.
 - Phase 7 acceptance test re-run: PASSED. py_compile clean on all 4 server files.
 - Remaining (user machine): merge PR #1, then live cross-surface test + HTTPS connector.
+
+## Turn 9 (Claude Code — wire-local.sh: one-command local wiring)
+- Built wire-local.sh: resolves ONE literal absolute workspace path (pwd -P, no ~/$VAR),
+  writes identical --workspace string into BOTH Claude Desktop (JSON merge, backup first,
+  preserves existing servers) and Claude Code (claude mcp add -s user), then verifies both
+  resolve to the same room. Modes: default write, --print, --dry-run; OS-detects Desktop
+  config path (macOS/Linux/Windows); picks python3 or python.
+- Kills the path-drift footgun (plugin env block vs desktop --workspace arg were two
+  different mechanisms). Now one source string, verified equal.
+- Tested in sandboxed HOME: merge preserved globalShortcut + existing filesystem server;
+  claude mcp add ran + verified; backup written. All green.
+- CONNECT.md: added "Fastest path: one command" section + literal-path warning.
+- Generated a live preview of the cross-surface claim→refuse→handoff (verbatim refusal:
+  "task T-0001 is owned by claude-code until ... Use force=true to override.").
+- Branch note: no origin/main; claude/lucid-gauss-xrb545 is source of truth (PR #1 merged).
+
+## Turn 10 (Claude Code — PR #2 review fixes)
+- HIGH (Augment): _is_loopback("") returned True but "" binds to ALL interfaces →
+  bypassed the no-token guard. Removed "" from the safe set in all 4 server files.
+  This bug shipped in PR #1; PR #2's net diff now carries the fix into lucid-gauss.
+- MED: wire-local.sh converts pwd -P POSIX paths to Windows-native via cygpath on
+  MINGW/MSYS/CYGWIN (warns if cygpath absent).
+- MED: both servers refuse to start if workspace contains the "/ABSOLUTE/PATH/TO"
+  placeholder (catches unedited plugin/.mcp.json).
+- Verified: ""/0.0.0.0 refused, 127.0.0.1 starts, placeholder refused, wire-local
+  sandbox write preserves existing servers + verifies equal paths, Phase 7 PASSED.
+- Branch note: merged origin/lucid-gauss into youthful-cori (clean) to keep PR #2
+  conflict-free; force-push not used (denied + unnecessary).
+
+## Turn 11 (Claude Code — Windows-native wiring)
+- User is on Windows 11 Home (no Mac). wire-local.sh needs Git Bash/WSL; added
+  wire-local.ps1 (PowerShell, guaranteed present on Win11) as the native path.
+- ps1 mirrors the .sh: resolves one literal absolute Windows path, merges into
+  %APPDATA%\Claude\claude_desktop_config.json (backup + preserves existing servers),
+  registers Claude Code via `claude mcp add` (or prints it), verifies both equal.
+  Detects Python via py/python/python3; uses absolute interpreter path for the
+  Desktop command; -Print/-DryRun modes.
+- CONNECT.md: "Fastest path" now shows Windows PowerShell first, then bash; prereqs noted.
