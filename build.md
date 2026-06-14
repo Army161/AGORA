@@ -95,3 +95,16 @@
 - Generated a live preview of the cross-surface claim→refuse→handoff (verbatim refusal:
   "task T-0001 is owned by claude-code until ... Use force=true to override.").
 - Branch note: no origin/main; claude/lucid-gauss-xrb545 is source of truth (PR #1 merged).
+
+## Turn 10 (Claude Code — PR #2 review fixes)
+- HIGH (Augment): _is_loopback("") returned True but "" binds to ALL interfaces →
+  bypassed the no-token guard. Removed "" from the safe set in all 4 server files.
+  This bug shipped in PR #1; PR #2's net diff now carries the fix into lucid-gauss.
+- MED: wire-local.sh converts pwd -P POSIX paths to Windows-native via cygpath on
+  MINGW/MSYS/CYGWIN (warns if cygpath absent).
+- MED: both servers refuse to start if workspace contains the "/ABSOLUTE/PATH/TO"
+  placeholder (catches unedited plugin/.mcp.json).
+- Verified: ""/0.0.0.0 refused, 127.0.0.1 starts, placeholder refused, wire-local
+  sandbox write preserves existing servers + verifies equal paths, Phase 7 PASSED.
+- Branch note: merged origin/lucid-gauss into youthful-cori (clean) to keep PR #2
+  conflict-free; force-push not used (denied + unnecessary).
