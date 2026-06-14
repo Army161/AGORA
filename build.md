@@ -108,3 +108,13 @@
   sandbox write preserves existing servers + verifies equal paths, Phase 7 PASSED.
 - Branch note: merged origin/lucid-gauss into youthful-cori (clean) to keep PR #2
   conflict-free; force-push not used (denied + unnecessary).
+
+## Turn 11 (Claude Code — Windows-native wiring)
+- User is on Windows 11 Home (no Mac). wire-local.sh needs Git Bash/WSL; added
+  wire-local.ps1 (PowerShell, guaranteed present on Win11) as the native path.
+- ps1 mirrors the .sh: resolves one literal absolute Windows path, merges into
+  %APPDATA%\Claude\claude_desktop_config.json (backup + preserves existing servers),
+  registers Claude Code via `claude mcp add` (or prints it), verifies both equal.
+  Detects Python via py/python/python3; uses absolute interpreter path for the
+  Desktop command; -Print/-DryRun modes.
+- CONNECT.md: "Fastest path" now shows Windows PowerShell first, then bash; prereqs noted.
