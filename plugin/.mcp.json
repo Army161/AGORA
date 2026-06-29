@@ -4,7 +4,7 @@
       "command": "python3",
       "args": ["${CLAUDE_PLUGIN_ROOT}/server/agora_mcp.py", "--name", "Agora"],
       "env": {
-        "AGORA_WORKSPACE": "/ABSOLUTE/PATH/TO/.agora/main"
+        "AGORA_WORKSPACE": "~/.agora/main"
       }
     }
   }

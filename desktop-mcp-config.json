@@ -1,7 +1,8 @@
 {
-  "_comment": "Paste only the 'agora' block into your Claude Desktop mcpServers config.",
-  "_comment2": "Replace BOTH placeholder paths below with the same absolute path on your machine.",
-  "_comment3": "Windows: use 'python' instead of 'python3' if python3 is not on your PATH.",
+  "_comment": "EASIEST: run wire-local.sh (mac/Linux) or wire-local.ps1 (Windows) — it fills both paths for you and verifies they match. The block below is the manual fallback.",
+  "_comment2": "Paste only the 'agora' block into your Claude Desktop mcpServers config.",
+  "_comment3": "Edit ONE path: the absolute path to agora_mcp.py in THIS repo. The workspace (~/.agora/main) is shared as-is across surfaces — the Agora server expands ~ itself, so leave it literal.",
+  "_comment4": "Windows: use 'python' instead of 'python3' if python3 is not on your PATH.",
   "_desktop_config_paths": {
     "macOS":   "~/Library/Application Support/Claude/claude_desktop_config.json",
     "Windows": "%APPDATA%\\Claude\\claude_desktop_config.json",
@@ -13,7 +14,9 @@
       "args": [
         "/ABSOLUTE/PATH/TO/AGORA/server/agora_mcp.py",
         "--workspace",
-        "/ABSOLUTE/PATH/TO/.agora/main"
+        "~/.agora/main",
+        "--name",
+        "Agora"
       ]
     }
   }

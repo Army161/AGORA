@@ -25,34 +25,45 @@ and verifies both surfaces resolve to the same room. Then restart Desktop, run
 the manual/per-surface guide.
 
 ## The one golden rule
-Every surface must point at the **same workspace folder**. Because surfaces start from
-different places, use an **absolute path**, e.g. `/Users/you/projects/myproject/.agora`
-(call it `$WS` below). The engine is cross-process safe — several surfaces can run their
+Every surface must point at the **same workspace folder**. The shipped default is
+`~/.agora/main` (call it `$WS` below) — use it as-is and every surface lands in the same
+room with zero editing. The engine is cross-process safe: several surfaces can run their
 own server against the same folder at once; the mutex + atomic writes keep it clean.
-Use the **literal** absolute string everywhere — no `~`, no `$HOME` inside JSON config —
-or one surface lands in a different room and nothing appears to sync. `wire-local.sh`
-exists precisely to make that impossible.
+
+Why `~` is safe here (but `$HOME`/`$VAR` are not): the Agora server itself runs
+`os.path.expanduser` on the workspace arg, so `~/.agora/main` resolves to the *same*
+absolute path for your user on your machine no matter which surface launched it. A JSON
+config consumer, by contrast, will **not** expand `$HOME` or `${VAR}` — those reach the
+server as literal strings and land you in a different (broken) room. So: `~/.agora/main`
+or a literal absolute path — never `$HOME`/`$VAR` — and `wire-local.sh` writes a fully
+literal path if you'd rather not rely on `~` at all.
 
 One-time on the machine that holds the folder:
 ```bash
 pip install -r server/requirements.txt
-export WS=/ABSOLUTE/PATH/TO/myproject/.agora     # pick one real path
+export WS=~/.agora/main           # the default room — or pick your own
 ```
 
-## 1. Claude Code  (easiest)
-Use the plugin (auto-launches the server). To share with other surfaces, set an absolute
-workspace instead of the default `./.agora`: edit `plugin/.mcp.json` args to
-`["${CLAUDE_PLUGIN_ROOT}/server/agora_mcp.py","--workspace","/ABSOLUTE/.../myproject/.agora"]`.
+## 1. Claude Code  (easiest — zero edits)
+Use the plugin (auto-launches the server). `plugin/.mcp.json` ships ready to run: the
+server path resolves via `${CLAUDE_PLUGIN_ROOT}` and the workspace defaults to the shared
+`~/.agora/main` room — no editing needed. Only touch it to pick a *different* room: change
+`env.AGORA_WORKSPACE` to another `~/.agora/<name>` or a literal absolute path.
 Verify: run `/agora-board`.
 
 ## 2. Claude Desktop / Cowork
-Add Agora to the desktop app's MCP config (a JSON with an `mcpServers` block):
+Add Agora to the desktop app's MCP config (a JSON with an `mcpServers` block). Copy the
+`agora` block from `desktop-mcp-config.json` and edit the **one** machine-specific value —
+the absolute path to `agora_mcp.py` in this repo (the `~/.agora/main` workspace stays
+as-is):
 ```json
 {"mcpServers":{"agora":{"command":"python3",
- "args":["/ABSOLUTE/.../server/agora_mcp.py","--workspace","/ABSOLUTE/.../myproject/.agora"]}}}
+ "args":["/ABSOLUTE/.../AGORA/server/agora_mcp.py","--workspace","~/.agora/main","--name","Agora"]}}}
 ```
-Confirm the exact config-file location for your build at https://support.claude.com or
-https://docs.claude.com, then restart the app. Verify by asking it to call `agora_board`.
+Or skip the editing entirely: run `wire-local.sh` / `wire-local.ps1`, which fills that
+path in for you. Confirm the exact config-file location for your build at
+https://support.claude.com or https://docs.claude.com, then restart the app. Verify by
+asking it to call `agora_board`.
 
 ## 3. Design
 Design runs inside Cowork/Desktop. Once #2 is connected, Design uses the same Agora tools
