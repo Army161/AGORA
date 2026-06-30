@@ -49,10 +49,24 @@ case "$(uname -s)" in
     ;;
 esac
 
-# ── Pick a Python that exists on this machine ─────────────────────────────────
-if command -v python3 >/dev/null 2>&1; then PY="python3"
-elif command -v python >/dev/null 2>&1;  then PY="python"
-else echo "ERROR: neither python3 nor python found on PATH." >&2; exit 1; fi
+# ── Pick a Python that actually has the Agora deps (mcp + pydantic) ───────────
+# Probe each candidate rather than taking the first on PATH: the interpreter that
+# launches first isn't always the one where `pip install -r requirements.txt` ran,
+# and an app spawning a dep-less Python just sees the MCP server "fail to connect".
+PY=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import mcp, pydantic" >/dev/null 2>&1; then
+    PY="$cand"; break
+  fi
+done
+if [ -z "$PY" ]; then
+  if command -v python3 >/dev/null 2>&1; then PY="python3"
+  elif command -v python >/dev/null 2>&1; then PY="python"
+  else echo "ERROR: neither python3 nor python found on PATH." >&2; exit 1; fi
+  echo "WARNING: '$PY' cannot import the Agora deps (mcp + pydantic)." >&2
+  echo "         Install them first:  $PY -m pip install -r \"$REPO_DIR/server/requirements.txt\"" >&2
+  echo "         The server will fail to start until you do." >&2
+fi
 
 # ── Locate the Claude Desktop config for this OS ──────────────────────────────
 case "$(uname -s)" in

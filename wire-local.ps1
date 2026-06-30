@@ -31,13 +31,32 @@ if (-not (Test-Path -LiteralPath $Server)) {
   exit 1
 }
 
-# ── Pick a Python that exists (py launcher preferred on Windows) ───────────────
-$pyCmd = Get-Command py, python, python3 -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $pyCmd) {
+# ── Pick a Python that actually has the Agora deps (mcp + pydantic) ────────────
+# Don't just take the first Python on PATH: the `py` launcher defaults to the
+# NEWEST installed Python, which is often NOT the one where you ran
+# `pip install -r server/requirements.txt`. Probe each candidate and pick the
+# first that can import the server's dependencies — otherwise an app spawning it
+# gets a ModuleNotFoundError and the MCP server silently "fails to connect".
+$candidates = Get-Command py, python, python3 -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty Source -Unique
+if (-not $candidates) {
   Write-Error "Python not found. Install it from https://www.python.org/downloads/ (tick 'Add python.exe to PATH'), then re-run."
   exit 1
 }
-$PY = $pyCmd.Source   # absolute path — most reliable when an app spawns it
+$PY = $null
+foreach ($cand in $candidates) {
+  & $cand -c "import mcp, pydantic" 2>$null
+  if ($LASTEXITCODE -eq 0) { $PY = $cand; break }
+}
+if (-not $PY) {
+  # None can import the deps — fall back to the first real Python but warn loudly,
+  # since the server won't start until its requirements are installed there.
+  $PY = $candidates | Select-Object -First 1
+  $req = Join-Path $RepoDir "server\requirements.txt"
+  Write-Warning "No Python on PATH can import the Agora deps (mcp + pydantic)."
+  Write-Warning "Install them into the Python you'll use:  & `"$PY`" -m pip install -r `"$req`""
+  Write-Warning "Proceeding with $PY so you can see the config, but the server will fail to start until deps are installed."
+}
 
 # ── Claude Desktop config location on Windows ─────────────────────────────────
 $DesktopCfg = Join-Path $env:APPDATA "Claude\claude_desktop_config.json"
