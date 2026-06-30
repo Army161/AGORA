@@ -391,7 +391,8 @@ const Adapter={
   async load(){ try{ const r=await fetch(BRIDGE+'/state',{cache:'no-store'}); if(r.ok){ LIVE=true; return await r.json(); } }catch(e){} LIVE=false; await wait(500); return seed(); }
 };
 async function commit(action,payload){ if(!LIVE)return; try{ await fetch(BRIDGE+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload:payload||{}})}); S=await Adapter.load(); render(); }catch(e){ toast('Sync failed','bad',e.message);} }
-async function refreshLive(){ try{ const r=await fetch(BRIDGE+'/state',{cache:'no-store'}); if(r.ok){ S=await r.json(); renderTicker(); render(); setConn(true);} }catch(e){ setConn(false);} }
+let _stateHash=null;
+async function refreshLive(){ try{ const r=await fetch(BRIDGE+'/state',{cache:'no-store'}); if(r.ok){ setConn(true); const data=await r.json(); const h=JSON.stringify(data); if(h===_stateHash) return; /* nothing changed → don't touch the DOM (no flash) */ _stateHash=h; S=data; renderTicker(); render(true); } }catch(e){ setConn(false);} }
 function setConn(live){ const c=$('#conn'); if(c)c.classList.toggle('off',!live); const l=$('#connlabel'); if(l)l.textContent=live?'Live · connected':'Live · demo'; }
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const BRIDGE=(new URLSearchParams(location.search)).get('bridge')||(location.protocol==='file:'?'http://localhost:8849':location.origin);
@@ -632,12 +633,14 @@ function skeleton(){return `<div class="stagger">
 
 /* ---------- main render ---------- */
 const RENDER={overview:vOverview,workspace:vWorkspace,tasks:vTasks,threads:vThreads,memory:vMemory,logs:vLogs,settings:vSettings};
-function render(){
+function render(live){
   if(!loaded){$('#view').innerHTML=skeleton();return;}
   $('#vtitle').textContent=VIEWS.find(v=>v.id===VIEW).name;
   renderNav();renderAgents();renderTicker();
   const el=$('#view');el.innerHTML=RENDER[VIEW]();
-  el.classList.remove('view');void el.offsetWidth;el.classList.add('view');
+  // Replay the entrance animation only on real view switches — NOT on live data
+  // refreshes, otherwise the panel visibly flashes every poll.
+  if(!live){ el.classList.remove('view');void el.offsetWidth;el.classList.add('view'); }
 }
 function renderDock(){
   const m=S.memory;
@@ -676,9 +679,10 @@ function tick(){
 }
 let tickCount=0;
 function refreshLeases(){
-  const cells=$$('#view tbody tr');
-  // map rows to tasks by order of current sort — re-render whole table body cheaply
   const tbody=$('#view tbody'); if(!tbody)return;
+  // Only rebuild the table body while a lease is actually counting down; with no
+  // live lease there's nothing to tick, so skip the rebuild and avoid a 1s flicker.
+  if(!S.tasks.some(t=>t.lease_until&&t.lease_until>now()))return;
   const rows=[...S.tasks].sort((a,b)=>{let x=a[sortKey],y=b[sortKey];if(typeof x==='string'){x=x.toLowerCase();y=(y||'').toLowerCase();}return (x>y?1:x<y?-1:0)*sortDir;});
   tbody.innerHTML=rows.map(taskRow).join('');
 }
