@@ -65,26 +65,27 @@ path in for you. Confirm the exact config-file location for your build at
 https://support.claude.com or https://docs.claude.com, then restart the app. Verify by
 asking it to call `agora_board`.
 
-## 3. Design
-Design runs inside Cowork/Desktop. Once #2 is connected, Design uses the same Agora tools
-as a participant — give it surface="design" when it joins. If your build does not expose
-the tools to Design directly, have Cowork relay (post handoffs/updates on its behalf) or
-point Design at `board.md` for read-only awareness. (Verify on your build.)
+## 3. Design, 4. Chrome extension, and 5. claude.ai web  (need a public HTTPS connector)
+These three attach the same way: as a **Custom Connector** over HTTPS. They do NOT accept a
+pasted bearer token — a Custom Connector discovers OAuth metadata and self-registers a
+client (RFC 7591 Dynamic Client Registration), then sends your browser through a normal
+OAuth authorization-code + PKCE flow. `agora_mcp.py --oauth` implements that handshake for
+real: any client may register, but nobody gets a token without your passphrase at a consent
+page only you can approve.
 
-## 4. Chrome extension
-Chrome participates when driven through the Claude desktop app (same MCP tools as #2),
-surface="chrome". If third-party MCP tools are not exposed in your Chrome build, treat it
-as a thin participant: it reads `board.md` and a human relays its work via Cowork. (Verify
-on your build.)
-
-## 5. claude.ai web  (Phase 6 — needs HTTPS)
-Web cannot reach localhost. Run ONE server over HTTP and expose it:
+Order matters — start the tunnel first, since the server has to advertise its real public
+URL in its OAuth metadata from the moment it starts:
 ```bash
-python3 server/agora_mcp.py --http --host 0.0.0.0 --port 8848 --workspace "$WS"
+cloudflared tunnel --url http://localhost:8848      # copy the https://...trycloudflare.com URL
+export AGORA_PUBLIC_URL=https://your-tunnel-url.trycloudflare.com
+export AGORA_WORKSPACE="$WS"
+./start-web-connector.sh                             # or start-web-connector.ps1 -PublicUrl ... on Windows
 ```
-Put it behind a tunnel/host with HTTPS, add the public URL as a **Custom Connector** in
-claude.ai settings (current steps: https://support.claude.com), and install the standalone
-skill (`skill/agora/SKILL.md`). Add a shared-secret header before exposing it publicly.
+It prints an approval passphrase (or reuses `$AGORA_TOKEN` if you set one). Then in each
+surface: **Settings → Connectors → Add Custom Connector** → paste `$AGORA_PUBLIC_URL/mcp`.
+It self-registers automatically; your browser opens a consent page — type the passphrase
+once per connector to approve. After that, each surface calls `agora_join` with its own
+`surface` value (`design`, `chrome`, or `claude_ai`) exactly like Code/Desktop do.
 
 ## Verify the room (any two surfaces)
 1. A: `agora_join` → `agora_add_task` → `agora_claim_task`.

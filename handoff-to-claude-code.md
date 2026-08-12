@@ -15,10 +15,12 @@ export AGORA_WORKSPACE=~/.agora/myproject
   ```
 - **Claude Desktop / Cowork**: add the same server to the desktop MCP config. Design and
   Chrome inherit MCP tools when run through the desktop app.
-- **claude.ai web**: requires HTTPS. Run `python server/agora_mcp.py --http --port 8848`
-  then expose it (e.g. a tunnel) and register the public URL as a Custom Connector in
-  claude.ai settings. Verify the docs at https://support.claude.com for the current
-  connector steps before configuring.
+- **claude.ai web / Design / Chrome**: these attach as a Custom Connector over HTTPS and
+  authenticate via real OAuth 2.1 (Dynamic Client Registration + PKCE) — a pasted bearer
+  token isn't enough, since the connector self-registers and redirects the browser through
+  an authorization flow. Use `start-web-connector.sh` / `.ps1`, which runs
+  `agora_mcp.py --http --oauth --public-url ...` and implements that flow. See
+  `CONNECT.md` §3–5 for the exact tunnel-first steps.
 
 ## 2. Build remaining phases (or let this Claude session continue them)
 - Phase 2 plugin, Phase 3 skill, Phase 4 guides, Phase 5 dashboard (specs in plan.md / todolist.md).
