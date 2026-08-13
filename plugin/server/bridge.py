@@ -70,6 +70,7 @@ def shape_state():
         "id": a["agent_id"], "name": a.get("display_name") or a["agent_id"], "surface": a["surface"],
         "role": a.get("role", ""), "presence": STORE._presence(a),
         "current": a.get("current") or "idle", "load": load_of(a["agent_id"]),
+        "joined_at": iso2ms(a.get("joined_at", "")),
     } for a in agents_raw.values()]
     tasks = [{
         "id": t["id"], "title": t["title"], "status": t["status"], "owner": t.get("owner"),
