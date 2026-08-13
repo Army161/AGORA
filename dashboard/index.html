@@ -12,8 +12,13 @@
   --bg:#f3eee6; --bg2:#e9e1d4; --panel:#fffdf9; --panel2:#f6f0e7; --raise:#fffefb;
   --ink:#2a2520; --ink2:#534a40; --muted:#857a6c; --line:#e6ddce; --line2:#d8cdbb;
   --accent:#c1572f; --accent2:#a8431f; --accent-ink:#fff;
-  --ok:#3f7350; --warn:#9a6a1c; --bad:#a83c22;
-  --a-coral:#c1572f; --a-teal:#2f8079; --a-violet:#7a52a8; --a-amber:#9a6a1c; --a-blue:#356a9c; --a-sage:#4f7a4f;
+  --ok:#3f7350; --warn:#9a6a1c; --bad:#a83c22; --info:#7a52a8;
+  /* Categorical (agent-surface) palette — validated: node dataviz/scripts/validate_palette.js
+     "#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300" --mode light --surface "#fffdf9" → ALL PASS.
+     Order matters (CVD-safety), keep it. Avatar text always uses --a-ink (near-black), never
+     white — several of these slots are too light for white text to clear contrast. */
+  --a-blue:#2a78d6; --a-orange:#eb6834; --a-aqua:#1baf7a; --a-yellow:#eda100; --a-magenta:#e87ba4; --a-green:#008300;
+  --a-ink:#1c130c;
   --shadow:0 1px 2px rgba(60,40,20,.06),0 8px 24px rgba(60,40,20,.06);
   --radius:14px; --radius-sm:9px;
   --font-display:'Fraunces',Georgia,serif; --font-sans:'IBM Plex Sans',system-ui,sans-serif; --font-mono:'IBM Plex Mono',ui-monospace,monospace;
@@ -22,8 +27,10 @@
   --bg:#15120e; --bg2:#0f0d0a; --panel:#211d17; --panel2:#1a1611; --raise:#262019;
   --ink:#efe7db; --ink2:#cabfae; --muted:#9a8f80; --line:#322b22; --line2:#3f372b;
   --accent:#e0875f; --accent2:#eda078; --accent-ink:#1c130c;
-  --ok:#7fb389; --warn:#d7a657; --bad:#e6886a;
-  --a-coral:#e0875f; --a-teal:#5fb3a8; --a-violet:#b491de; --a-amber:#d7a657; --a-blue:#79aede; --a-sage:#8cc190;
+  --ok:#7fb389; --warn:#d7a657; --bad:#e6886a; --info:#b491de;
+  /* validated: "#3987e5,#d95926,#199e70,#c98500,#d55181,#008300" --mode dark --surface "#211d17" → ALL PASS */
+  --a-blue:#3987e5; --a-orange:#d95926; --a-aqua:#199e70; --a-yellow:#c98500; --a-magenta:#d55181; --a-green:#008300;
+  --a-ink:#1c130c;
   --shadow:0 1px 2px rgba(0,0,0,.35),0 14px 40px rgba(0,0,0,.4);
 }
 *{box-sizing:border-box}
@@ -32,7 +39,7 @@ body{margin:0;font-family:var(--font-sans);background:var(--bg);color:var(--ink)
   font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
 body:before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
   background:radial-gradient(1100px 600px at 78% -8%, color-mix(in srgb,var(--accent) 13%,transparent), transparent 60%),
-             radial-gradient(900px 500px at -6% 108%, color-mix(in srgb,var(--a-teal) 10%,transparent), transparent 55%);}
+             radial-gradient(900px 500px at -6% 108%, color-mix(in srgb,var(--a-aqua) 10%,transparent), transparent 55%);}
 body:after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.035;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 ::selection{background:color-mix(in srgb,var(--accent) 40%,transparent)}
@@ -87,7 +94,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;border:none;background:n
 .agentrow:hover{background:var(--panel)}
 .agentrow.on{background:var(--panel);border-color:var(--line)}
 .av{width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;
-  font-family:var(--font-mono);font-size:11px;font-weight:500;color:#fff;position:relative}
+  font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--a-ink);position:relative}
 .av .pres{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;
   border:2px solid var(--panel2)}
 .pres.active{background:var(--ok)}.pres.away{background:var(--warn)}.pres.left{background:var(--muted)}
@@ -134,13 +141,44 @@ h2.sec{font-family:var(--font-display);font-size:22px;font-weight:600;margin:0 0
   padding:3px 9px;border-radius:20px;border:1px solid var(--line2);color:var(--ink2);background:var(--panel2)}
 .chip.tag{font-family:var(--font-mono);font-size:10.5px}
 .st{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:capitalize}
+/* Status chips use the reserved status set (ok/warn/bad/info), never a categorical
+   agent-surface hue — keeps "what state is this in" visually distinct from "who owns it". */
 .st.todo{background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--ink2)}
-.st.in_progress{background:color-mix(in srgb,var(--a-blue) 20%,transparent);color:var(--a-blue)}
+.st.in_progress{background:color-mix(in srgb,var(--info) 20%,transparent);color:var(--info)}
 .st.blocked{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
-.st.review{background:color-mix(in srgb,var(--a-violet) 20%,transparent);color:var(--a-violet)}
+.st.review{background:color-mix(in srgb,var(--info) 20%,transparent);color:var(--info)}
 .st.done{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
 .st.open{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
-.st.acked{background:color-mix(in srgb,var(--a-blue) 20%,transparent);color:var(--a-blue)}
+.st.acked{background:color-mix(in srgb,var(--info) 20%,transparent);color:var(--info)}
+
+/* room hero — everyone in this room, one room, no cap on how many show */
+.roomhero{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.roomhero .rh-title{font-family:var(--font-display);font-size:22px;font-weight:600}
+.roomhero .rh-count{font-family:var(--font-mono);font-size:13px;color:var(--muted);
+  background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 11px}
+.agentgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:26px}
+.agentcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:14px 16px;display:flex;gap:12px;align-items:flex-start;
+  transition:.15s;cursor:pointer}
+.agentcard:hover{border-color:var(--line2);transform:translateY(-1px)}
+.agentcard .av{width:38px;height:38px;border-radius:11px;font-size:13px}
+.agentcard .av .pres{width:11px;height:11px;border:2px solid var(--panel)}
+.agentcard .ac-body{min-width:0;flex:1}
+.agentcard .ac-name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px}
+.agentcard .ac-surface{font-size:11px;color:var(--muted);margin-top:1px}
+.agentcard .ac-current{font-size:12px;color:var(--ink2);margin-top:9px;padding-top:9px;
+  border-top:1px solid var(--line);display:flex;align-items:flex-start;gap:6px}
+.agentcard .ac-current svg{width:12px;height:12px;flex:none;margin-top:2px;color:var(--muted)}
+.agentcard .ac-meta{font-size:10.5px;color:var(--muted);margin-top:7px;font-family:var(--font-mono)}
+.agentcard .ac-presdot{font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;
+  text-transform:capitalize}
+.agentcard .ac-presdot:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.agentcard .ac-presdot.active{color:var(--ok)}.agentcard .ac-presdot.away{color:var(--warn)}.agentcard .ac-presdot.left{color:var(--muted)}
+.addagent{border:1.5px dashed var(--line2);background:transparent;box-shadow:none;
+  display:flex;align-items:center;justify-content:center;gap:8px;min-height:96px;color:var(--muted);
+  font-size:12.5px;text-align:center;flex-direction:column}
+.addagent:hover{border-color:var(--accent);color:var(--accent)}
+.addagent svg{width:20px;height:20px}
 
 /* KPI grid */
 .kpigrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
@@ -269,7 +307,7 @@ textarea{resize:vertical;min-height:64px;line-height:1.5}
     </div>
     <div class="navlabel">Workspace</div>
     <nav class="nav" id="nav"></nav>
-    <div class="navlabel">Agents</div>
+    <div class="navlabel" id="agentslabel">Agents</div>
     <div class="agents-scroll" id="agentlist"></div>
   </aside>
 
@@ -331,7 +369,7 @@ const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 /* ---------- DATA ADAPTER (mirrors Agora store; swap for live .agora in Phase 6) ---------- */
 const now=()=>Date.now();
 const mins=m=>m*60000;
-const ACCENTS={claude:'--a-coral',claude_code:'--a-blue',cowork:'--a-teal',claude_ai:'--a-amber',design:'--a-violet',chrome:'--a-sage'};
+const ACCENTS={claude_code:'--a-blue',design:'--a-orange',cowork:'--a-aqua',claude_ai:'--a-yellow',chrome:'--a-magenta',other:'--a-green',claude:'--a-blue'};
 let SEQ=40;
 function seed(){
   const t0=now();
@@ -410,7 +448,7 @@ const VIEWS=[
   {id:'settings',name:'Settings',icon:I.set,key:'7'},
 ];
 const agent=id=>S.agents.find(a=>a.id===id);
-const ac=a=>`var(${ACCENTS[a?a.surface:'claude']||'--a-coral'})`;
+const ac=a=>`var(${ACCENTS[a?a.surface:'other']||'--a-green'})`;
 const initials=a=>a.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
 function presence(a){return a.presence;}
 function timeAgo(ts){const s=(now()-ts)/1000;if(s<60)return Math.floor(s)+'s';if(s<3600)return Math.floor(s/60)+'m';return Math.floor(s/3600)+'h';}
@@ -439,6 +477,13 @@ function renderAgents(){
       <div class="av" style="background:${ac(a)}">${initials(a)}<span class="pres ${presence(a)}"></span></div>
       <div style="min-width:0"><div class="nm">${esc(a.name)}</div><div class="rl">${esc(a.current)}</div></div>
     </div>`).join('');
+  const lab=$('#agentslabel'); if(lab)lab.textContent=`Agents · ${S.agents.length}`;
+  const ws=$('#wsname'); if(ws)ws.textContent=roomName();
+}
+function roomName(){
+  const w=S.settings&&S.settings.workspace;
+  if(!w)return'Agora';
+  return w.replace(/[\\/]+$/,'').split(/[\\/]/).pop()||w;
 }
 function renderTicker(){
   const k=kpis();
@@ -447,31 +492,49 @@ function renderTicker(){
 }
 
 /* ---------- views ---------- */
+const SURFACE_LABEL={claude_code:'Claude Code',cowork:'Cowork / Desktop',claude_ai:'claude.ai (web)',design:'Claude Design',chrome:'Chrome extension',other:'Other',claude:'Claude'};
 function vOverview(){
   const k=kpis();
-  const cards=[['Active agents',k.active,'+1','up'],['Open tasks',k.open,'-2','up'],
-    ['In progress',k.prog,'+1','up'],['Open handoffs',k.handoffs,'0','up']];
+  const cards=[['Open tasks',k.open,'-2','up'],['In progress',k.prog,'+1','up'],
+    ['Open handoffs',k.handoffs,'0','up'],['Events logged',k.events,'','up']];
   const recent=[...S.events].slice(-8).reverse();
   return `<div class="stagger">
-    <div><h2 class="sec">Overview</h2><p class="lede">Live snapshot of the ${esc(S.settings.workspace.split('/').pop())} room · ${S.agents.length} agents</p></div>
+    <div><h2 class="sec">Overview</h2><p class="lede">One shared room: ${esc(roomName())} · everyone below is reading and writing the same workspace</p></div>
+
+    <div class="roomhero">
+      <div class="rh-title">Agents in this room</div>
+      <div class="rh-count">${S.agents.length} connected</div>
+    </div>
+    <div class="agentgrid">
+      ${S.agents.map(agentCard).join('')}
+      <div class="card agentcard addagent" data-act="howtoconnect">
+        ${svg(I.plus,20)}<span>Connect another surface<br>(Design, Chrome, claude.ai…)</span>
+      </div>
+    </div>
+
     <div class="kpigrid">${cards.map(([l,v,d,dir])=>`
       <div class="card kpi"><div class="pad"><div class="lab">${l}</div>
-      <div class="val" data-kpiv="${l}">${v}</div><div class="delta ${dir}">${d} vs last hr</div>
+      <div class="val" data-kpiv="${l}">${v}</div>${d?`<div class="delta ${dir}">${d} vs last hr</div>`:'<div class="delta">&nbsp;</div>'}
       <svg class="spark" width="56" height="22" viewBox="0 0 56 22"><polyline fill="none" stroke="${'var(--accent)'}" stroke-width="2" points="0,16 9,12 18,14 27,7 36,9 45,4 56,6"/></svg></div></div>`).join('')}
     </div>
-    <div class="row" style="align-items:flex-start">
-      <div class="card" style="flex:1.4;min-width:0"><div class="pad" style="padding-bottom:6px"><b style="font-family:var(--font-display);font-size:15px">Live activity</b></div>
-        <table><thead><tr><th>When</th><th>Event</th><th>Actor</th><th>Type</th></tr></thead><tbody id="actbody">
-        ${recent.map(rowEvent).join('')}</tbody></table></div>
-      <div class="card" style="flex:1;min-width:0"><div class="pad"><b style="font-family:var(--font-display);font-size:15px">Agents</b>
-        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-        ${S.agents.map(a=>`<div style="display:flex;align-items:center;gap:10px">
-          <div class="av" style="background:${ac(a)}">${initials(a)}<span class="pres ${presence(a)}"></span></div>
-          <div style="min-width:0;flex:1"><div style="font-weight:600;font-size:12.5px">${esc(a.name)} <span style="color:var(--muted);font-weight:400">· ${esc(a.role)}</span></div>
-          <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.current)}</div></div>
-          <span class="st ${a.presence==='active'?'done':'todo'}">${a.presence}</span></div>`).join('')}
-        </div></div></div>
+    <div class="card"><div class="pad" style="padding-bottom:6px"><b style="font-family:var(--font-display);font-size:15px">Live activity</b></div>
+      <table><thead><tr><th>When</th><th>Event</th><th>Actor</th><th>Type</th></tr></thead><tbody id="actbody">
+      ${recent.length?recent.map(rowEvent).join(''):''}</tbody></table>
+      ${recent.length?'':emptyState('No activity yet','Once agents join and work, it shows up here.')}
     </div></div>`;
+}
+function agentCard(a){
+  const joined=a.joined_at?timeAgo(a.joined_at):null;
+  const surfLabel=SURFACE_LABEL[a.surface]||a.surface;
+  return `<div class="card agentcard" data-agent="${a.id}">
+    <div class="av" style="background:${ac(a)}">${initials(a)}<span class="pres ${presence(a)}"></span></div>
+    <div class="ac-body">
+      <div class="ac-name">${esc(a.name)}</div>
+      <div class="ac-surface">${esc(surfLabel)}${a.role?' · '+esc(a.role):''}</div>
+      <div class="ac-current">${svg(I.bolt,12)}<span>${esc(a.current||'idle')}</span></div>
+      <div class="ac-meta"><span class="ac-presdot ${presence(a)}">${presence(a)}</span>${joined?` · joined ${joined} ago`:''}</div>
+    </div>
+  </div>`;
 }
 const rowEvent=e=>`<tr><td class="lease" style="color:var(--muted)">${timeAgo(e.at)} ago</td><td>${esc(e.summary)}</td><td><span class="chip">${esc(agent(e.actor)?agent(e.actor).name:e.actor)}</span></td><td><span class="chip tag">${esc(e.kind)}</span></td></tr>`;
 
@@ -720,6 +783,7 @@ const ACT={
   menu:()=>$('#side').classList.toggle('open'),
   memory:()=>{const d=$('#dock');d.classList.toggle('open');$('#scrim').classList.toggle('on',d.classList.contains('open'));if(d.classList.contains('open'))renderDock();},
   palette:()=>openPalette(),
+  howtoconnect:()=>toast('Connect another surface',' ','Claude Code / Desktop: wire-local.ps1 or .sh. claude.ai / Design / Chrome: start-web-connector.ps1 or .sh, then add it as a Custom Connector. See CONNECT.md.'),
   closeall:()=>closeAll(),
   switchws:()=>toast('Workspace switcher','ok','Demo: one room loaded. Connect more in Settings → Workspace.'),
   autoroute:()=>{if(LIVE)return commit('route_all');const todo=S.tasks.filter(t=>!t.owner&&t.status==='todo');if(!todo.length){toast('Nothing to route','ok','No unassigned tasks.');return;}todo.forEach(routeTask);render();toast('Backlog routed','ok',`${todo.length} task(s) assigned by tag rules.`);},
