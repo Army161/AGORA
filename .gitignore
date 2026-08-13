@@ -8,3 +8,9 @@ build/
 .DS_Store
 *.agora/
 .agora/
+
+# Local session notes / scratch — never publish these
+.remember/
+*.local.json
+.env
+.env.*

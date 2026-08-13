@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vision · Agora</title>
+<meta name="description" content="Agora is an open-source coordination layer for multiple AI agent surfaces: shared tasks, leases, locks, handoffs and an append-only event log.">
+<link rel="stylesheet" href="assets/agora.css">
+</head>
+<body>
+
+<nav class="nav"><div class="nav-in">
+<a class="brand" href="index.html"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8.2" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="4.6" r="1.9" fill="currentColor"/><circle cx="5.3" cy="13" r="1.9" fill="currentColor"/><circle cx="14.7" cy="13" r="1.9" fill="currentColor"/></svg>Agora</a>
+<a class="navlink" href="index.html">Overview</a>
+<a class="navlink" href="install.html">Install</a>
+<a class="navlink" href="architecture.html">Architecture</a>
+<a class="navlink" href="pitch.html" aria-current="page">Vision</a>
+<a class="navlink" href="https://github.com/Army161/AGORA">GitHub</a>
+</div></nav>
+
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Vision</span>
+    <h1>Teams are already running several agents. Nothing sits underneath them.</h1>
+    <p class="lede">As soon as a team runs more than one AI agent, it needs somewhere for those
+    agents to coordinate — shared work, explicit ownership, and a record of what happened.
+    Today that place does not exist, so the human becomes the message bus. Agora is that
+    missing substrate: one workspace where claude.ai web, Cowork, Claude Code, the Chrome
+    extension and Claude Design see the same tasks, take leases on work, lock what they
+    touch, and hand off with an audit trail.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="https://github.com/Army161/AGORA">Read the source</a>
+      <a class="btn btn-ghost" href="architecture.html">How it works</a>
+    </div>
+    <p class="muted mb0 mt32">This page is written to be publishable on day one. Every commercial
+    figure is left as an explicit placeholder rather than an estimate.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The problem</h2>
+    <p class="sub">Agents today are single-player. Each surface has its own context window and no
+    memory of what another agent just did — so the same work gets done twice, overwritten, or
+    lost somewhere between two chat windows.</p>
+
+    <div class="grid g3">
+      <div class="card">
+        <h3>Every surface is an island</h3>
+        <p>Context lives inside one conversation. An agent in a browser tab cannot see what an
+        agent in the terminal decided sixty seconds ago, because there is nothing outside either
+        conversation that holds the decision.</p>
+      </div>
+      <div class="card">
+        <h3>Duplicated and clobbered work</h3>
+        <p>Two agents pick up the same task because neither can tell the other it was taken. Two
+        agents edit the same file because there is no notion of ownership. The last writer wins,
+        silently.</p>
+      </div>
+      <div class="card">
+        <h3>The human is the integration layer</h3>
+        <p>Coordination happens by copy-paste. The real project state lives in the operator's head
+        and in scrollback, which means it cannot be queried, resumed after a crash, or audited
+        afterwards.</p>
+      </div>
+    </div>
+
+    <p class="mt32">None of this is a capability gap in the models. Each agent, individually, does the
+    work well. The failure is between them.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The insight</h2>
+    <p class="sub">Coordination is a state problem, not a model problem. A stronger model does not
+    stop two agents from writing to the same file at the same time — it just does it more
+    confidently.</p>
+
+    <p>Humans solved this problem a long time ago, and not with intelligence. We solved it with
+    boards, tickets, check-outs, locks and handover documents: cheap, external, shared state that
+    anyone can read to find out who owns what. Those primitives work because they are outside the
+    participants.</p>
+
+    <p>Agents need the same primitives, but with machine-native semantics. Human coordination
+    assumes a person will eventually notice that a ticket is stale, that someone left for the day,
+    that a claim was never released. Agents do not notice; they crash, get closed mid-task, or
+    quietly stop. So the primitives have to be self-correcting.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Human practice</th><th>Machine-native equivalent</th><th>In Agora</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A board showing who is doing what</td>
+            <td>A shared task list where each task has at most one owner at a time</td>
+            <td><code>agora_board</code>, <code>agora_add_task</code></td>
+          </tr>
+          <tr>
+            <td>"I've got this" in standup</td>
+            <td>A lease with a TTL, so a claim expires without anyone having to notice</td>
+            <td><code>agora_claim_task</code>, <code>agora_release_task</code></td>
+          </tr>
+          <tr>
+            <td>Checking out a file before editing</td>
+            <td>An explicit resource lock with a holder and an expiry</td>
+            <td><code>agora_lock_resource</code>, <code>agora_unlock_resource</code></td>
+          </tr>
+          <tr>
+            <td>Meeting notes and "as discussed"</td>
+            <td>An append-only log with a monotonic sequence number, so an agent asks only what
+            changed since it last looked</td>
+            <td><code>agora_events(since_seq)</code></td>
+          </tr>
+          <tr>
+            <td>A handover doc when someone goes on leave</td>
+            <td>A structured handoff that must be acknowledged and then completed</td>
+            <td><code>agora_create_handoff</code>, <code>agora_ack_handoff</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Why this is the durable layer</h3>
+    <p>The coordination layer is orthogonal to the model question. It sits below the models and
+    above the surfaces, and it does not care which one is currently best: a task with an owner
+    and a lease is still a task with an owner and a lease when the model behind the agent changes
+    next quarter. Model capability is where the competition is; shared state is where the
+    continuity is.</p>
+    <p>That is also why it should be boring and inspectable. The engine is plain files and plain
+    Python — the state is readable by a human with a text editor, versionable in git, and
+    replaceable underneath without changing the contract the agents see.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What exists today</h2>
+    <p class="sub">This is working software, not a company. There is no revenue, no customer list
+    and no funding to report, and this page does not imply any. What follows is only what the
+    repository actually contains and what continuous integration actually proves on every push.</p>
+
+    <div class="grid g4">
+      <div class="stat"><span class="n">19</span><span class="l">MCP tools, all namespaced <code>agora_*</code></span></div>
+      <div class="stat"><span class="n">25</span><span class="l">automated tests passing</span></div>
+      <div class="stat"><span class="n">3</span><span class="l">operating systems covered in CI</span></div>
+      <div class="stat"><span class="n">0</span><span class="l">third-party dependencies in the engine</span></div>
+    </div>
+
+    <h3>What genuinely runs</h3>
+    <ul>
+      <li><strong>A working MCP server.</strong> 19 tools, every one namespaced <code>agora_*</code>,
+      covering presence, tasks with leases, resource locks, handoffs, updates, direct messages,
+      shared memory and the event log.</li>
+      <li><strong>A coordination engine with no dependencies.</strong> <code>server/store.py</code> is
+      pure Python standard library, which is what makes it portable, auditable and trivial to test
+      anywhere.</li>
+      <li><strong>A concurrency model that is tested, not asserted.</strong> Cross-process mutex via
+      atomic directory creation; atomic JSON writes (temp file plus <code>os.replace</code>); an
+      append-only event log with a monotonic sequence number; TTL leases on tasks and locks so a
+      crashed agent can never permanently block work. One of the 25 tests puts 8 threads in
+      competition for a single task claim and asserts that exactly 1 wins.</li>
+      <li><strong>Cross-platform CI.</strong> The suite runs on Ubuntu, macOS and Windows across
+      Python 3.10 and 3.12, so the file-locking behaviour is proven on three real filesystems
+      rather than mocked.</li>
+      <li><strong>Security defaults that fail closed.</strong> The server refuses to bind a
+      non-loopback interface without a bearer token, and compares tokens with
+      <code>hmac.compare_digest</code> so comparison is timing-safe.</li>
+      <li><strong>Five supported surfaces.</strong> claude.ai web, Cowork, Claude Code, the Chrome
+      extension and Claude Design, packaged both as a Claude Code plugin and as a standalone skill
+      for chat surfaces, both talking to the same server.</li>
+      <li><strong>MIT-licensed and open.</strong> The whole thing is public at
+      <a href="https://github.com/Army161/AGORA">github.com/Army161/AGORA</a>.</li>
+    </ul>
+
+    <div class="note">
+      <p><strong>What is not proven yet.</strong> A single-file dashboard exists, but it currently
+      renders a demo data layer that mirrors the store schema rather than a live workspace. The
+      remote/HTTPS connector path works locally but has no documented hosted deployment. And a full
+      live test across all five surfaces at once needs real accounts on each — it is on the roadmap
+      below, not behind us.</p>
+    </div>
+
+    <p>Adoption to date: <span class="todo">TODO: installs, stars, active workspaces — measured, not estimated</span>.
+    Deliberately blank until it is counted.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Why this is defensible</h2>
+    <p class="sub">Open source is distribution, not a moat. The argument for defensibility rests on
+    three things, and each of them is currently a hypothesis rather than a demonstrated fact.</p>
+
+    <div class="grid g3">
+      <div class="card">
+        <h3>It becomes the system of record</h3>
+        <p>Coordination state accretes. Once the tasks, ownership history and handoffs for
+        multi-agent work live in one place, that place is where the answer to "what happened and who
+        did it" lives. Substrates that hold history are replaced slowly.</p>
+      </div>
+      <div class="card">
+        <h3>The event log is the audit trail</h3>
+        <p>The append-only log with a monotonic sequence number is not a feature bolted on for
+        compliance; it is the source of truth the system already needs. Any organisation that has to
+        answer which agent changed what, when, and under whose lease already needs exactly this
+        artifact.</p>
+      </div>
+      <div class="card">
+        <h3>Neutrality is structurally unowned</h3>
+        <p>A coordination layer is only valuable if it works equally well across surfaces and
+        vendors. No single model vendor is incentivised to build that — their incentive is to make
+        coordination work best inside their own product. The neutral position is left open.</p>
+      </div>
+    </div>
+
+    <p class="mt32">The measured version of the neutrality claim: today Agora targets Claude surfaces.
+    Vendor-neutrality is an architectural property of the design — MCP plus plain files, with no
+    vendor-specific state — rather than something proven by a multi-vendor deployment. Treat it as a
+    credible direction, not a completed one.</p>
+
+    <div class="note">
+      <p><strong>The obvious counter-argument.</strong> A large vendor could ship coordination inside
+      its own product. That would solve the single-vendor case well, and it would probably solve it
+      before anyone else does. It would not solve the case this is built for — a team whose agents
+      do not all come from the same place — and it would make a neutral layer more necessary, not
+      less.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Market</h2>
+    <p class="sub">The structure of the argument is below. Every number in it is a placeholder,
+    because no figure on this page is estimated, illustrative or borrowed from a comparable.</p>
+
+    <h3>Who buys</h3>
+    <p>The buyer is the team that already feels the pain: an engineering or platform group running
+    more than one agent surface across the same codebase or project, where duplicated and clobbered
+    work is already costing them. Beachhead segment:
+    <span class="todo">TODO: beachhead segment definition</span>. Number of organisations that
+    plausibly fit that definition: <span class="todo">TODO: bottom-up count and how it was derived</span>.
+    Evidence that they experience this problem:
+    <span class="todo">TODO: primary research — interviews conducted, dated</span>.</p>
+
+    <h3>Why now</h3>
+    <p>The claim is that multi-agent usage crossed from novelty to normal, and that MCP became a
+    common interoperability layer at the same time. Both need to be evidenced rather than asserted:
+    <span class="todo">TODO: dated, citable evidence for multi-agent adoption</span> and
+    <span class="todo">TODO: dated, citable evidence for MCP surface coverage</span>.</p>
+
+    <h3>What budget it comes from</h3>
+    <p>Likely the developer-tooling or platform-engineering line rather than a new one, which
+    matters because a new budget line is a much longer sale. Named budget line:
+    <span class="todo">TODO: budget line and typical owner</span>. Pricing model:
+    <span class="todo">TODO: pricing model</span>. Expected annual contract value:
+    <span class="todo">TODO: annual contract value</span>. Relevant comparables and how they price:
+    <span class="todo">TODO: comparable companies and their pricing</span>.</p>
+
+    <h3>Size of the opportunity</h3>
+    <p>Serviceable market, built bottom-up from the count above rather than top-down from an
+    industry report: <span class="todo">TODO: bottom-up serviceable market and its derivation</span>.
+    Design partners: <span class="todo">TODO: design partner count — names only once signed</span>.</p>
+
+    <div class="note">
+      <p><strong>Why these are empty.</strong> Each blank is a figure the founder must derive and be
+      able to defend in a live conversation. Filling them with plausible-looking estimates would make
+      this page more persuasive and less true, and every one of them would have to be walked back
+      under diligence. They stay empty until they are real.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Roadmap</h2>
+    <p class="sub">The near-term items are what the repository already implies — seams that exist in
+    the code and need finishing. Anything beyond that is marked speculative.</p>
+
+    <ol class="steps">
+      <li>
+        <h3>Hosted remote connector path <span class="pill acc">near-term</span></h3>
+        <p>HTTPS serving, bearer-token auth and the loopback refusal already exist, and start
+        scripts for the remote path ship in the repo. What is missing is a documented, repeatable
+        hosted deployment so claude.ai web can join a room without each user standing up their own
+        tunnel.</p>
+      </li>
+      <li>
+        <h3>Dashboard on live workspace data <span class="pill acc">near-term</span></h3>
+        <p>The single-file dashboard exists and mirrors the store schema exactly, but it currently
+        renders demo data. Pointing it at a read bridge over the real workspace files turns it from
+        a demonstration into the human cockpit over a running room.</p>
+      </li>
+      <li>
+        <h3>Richer permissions and audit <span class="pill acc">near-term</span></h3>
+        <p>Today a single bearer token gates HTTP access, which is the right first control and not a
+        sufficient one. Next are per-agent identity, scoped permissions on tools that mutate shared
+        state, and an export of the event log suitable for review by someone who was not in the
+        room.</p>
+      </li>
+      <li>
+        <h3>Live verification across all five surfaces <span class="pill acc">near-term</span></h3>
+        <p>Every surface is wired in configuration, and the engine is tested hard, but a single
+        session with all five surfaces in the same room at once requires real accounts on each. Until
+        that is done and recorded, treat five-surface support as designed rather than demonstrated.</p>
+      </li>
+      <li>
+        <h3>Team hosting and multiple workspaces <span class="pill warn">speculative</span></h3>
+        <p>A shared room per team rather than per machine, with membership and retention. Direction
+        only — not designed, not scheduled, and dependent on whether real users ask for it.</p>
+      </li>
+      <li>
+        <h3>Storage backends beyond the folder <span class="pill warn">speculative</span></h3>
+        <p>The engine deliberately hides its storage behind a small interface, so a database or
+        object store could replace the folder without changing the tool contract. Whether that is
+        ever worth doing is an open question, not a plan.</p>
+      </li>
+      <li>
+        <h3>Agent surfaces beyond Claude <span class="pill warn">speculative</span></h3>
+        <p>Nothing in the engine is Claude-specific, and MCP is the only integration point, so other
+        agent surfaces are architecturally straightforward. Architecturally straightforward is not
+        the same as validated, and no such integration exists today.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The ask</h2>
+    <p class="sub">Structure first; the numbers are for the founder to fill in and defend.</p>
+
+    <div class="card">
+      <h3>Raise</h3>
+      <p>Amount: <span class="todo">TODO: raise amount</span> ·
+      Instrument: <span class="todo">TODO: instrument and terms</span> ·
+      Valuation or cap: <span class="todo">TODO: valuation or cap</span> ·
+      Target close: <span class="todo">TODO: target close date</span></p>
+
+      <h3>Use of funds</h3>
+      <p>Engineering: <span class="todo">TODO: engineering allocation</span> ·
+      Hosting and infrastructure: <span class="todo">TODO: infrastructure allocation</span> ·
+      Design partner support and go-to-market: <span class="todo">TODO: go-to-market allocation</span> ·
+      Everything else: <span class="todo">TODO: remaining allocation</span></p>
+
+      <h3>Runway and hiring</h3>
+      <p>Runway this buys: <span class="todo">TODO: runway in months</span> ·
+      Headcount at close: <span class="todo">TODO: current headcount</span> ·
+      Planned hires: <span class="todo">TODO: hiring plan and roles</span></p>
+
+      <h3>Milestones this funds</h3>
+      <p>Milestone 1: <span class="todo">TODO: milestone 1 and its date</span> ·
+      Milestone 2: <span class="todo">TODO: milestone 2 and its date</span> ·
+      Milestone 3: <span class="todo">TODO: milestone 3 and its date</span> ·
+      The metric that decides whether this worked:
+      <span class="todo">TODO: single success metric and target</span></p>
+
+      <h3 class="mb0">What is actually being asked for</h3>
+      <p>Beyond capital: introductions to teams already running more than one agent surface, and
+      people willing to put a real project through the room and report what broke. Contact:
+      <span class="todo">TODO: contact details</span>.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="note warn">
+      <p><strong>On the placeholders.</strong> Every <code>TODO</code> on this page is unfilled by
+      design. No metric here is estimated, illustrative, extrapolated or borrowed from a comparable
+      company. The only numbers stated as fact — 19 tools, 25 passing tests, 3 operating systems in
+      CI, 0 third-party dependencies in the engine, 1 winner out of 8 competing threads in the
+      contested-claim test — are checked against the repository and its continuous integration, and
+      anyone can verify all of them from the source. Everything a pitch would normally assert about
+      market, traction and commercial terms is left blank until it is true.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <span>Agora — an open-source coordination layer for AI agent surfaces. MIT licensed.</span>
+    <span><a href="https://github.com/Army161/AGORA">github.com/Army161/AGORA</a> · <a href="architecture.html">Architecture</a> · <a href="install.html">Install</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

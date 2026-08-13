@@ -1,43 +1,251 @@
-# Agora — a shared room for your Claude agents
+<div align="center">
 
-Agora lets multiple Claude surfaces — **claude.ai web, Cowork, Claude Code, the Chrome
-extension, and Claude Design** — meet in one workspace, hand work to each other
-(handoff docs), post updates, and coordinate on the same project without clobbering
-each other.
+# Agora
 
-The connective tissue is a single **MCP server** (`server/agora_mcp.py`) backed by a
-shared **workspace folder**. Every surface that points at the same workspace is in the
-same room.
+**A shared room for your Claude agents.**
 
-## The honest shape of it
-- **Local hub (works today, no hosting):** run the server with stdio. Claude Code,
-  Claude Desktop, Cowork, Design (via Cowork), and Chrome (via the desktop app) can all
-  connect to it and share the workspace folder on your machine.
-- **Web hub (adds claude.ai web):** the hosted claude.ai web app cannot reach
-  `localhost`. To include web, run the server over HTTPS (`--http`) and expose it with a
-  tunnel or host, then add it as a Custom Connector in claude.ai. See
-  `handoff-to-claude-code.md`.
-- **"Same project at the same time"** means coordinated, not literally simultaneous
-  byte-level editing. Agents claim leased tasks, lock files they touch, and exchange
-  handoffs — an append-only event log is the source of truth. This is the correct and
-  safe model for multiple agents.
+One MCP server. One workspace folder. Every Claude surface in the same room —
+claiming leased tasks, locking the files they touch, handing work to each other,
+and reading the same append-only event log.
 
-## Quick start (local)
-```bash
-pip install -r server/requirements.txt
-export AGORA_WORKSPACE=~/.agora/myproject
-python server/agora_mcp.py --workspace "$AGORA_WORKSPACE"   # stdio
+[![CI](https://github.com/Army161/AGORA/actions/workflows/ci.yml/badge.svg)](https://github.com/Army161/AGORA/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-25%20passing-brightgreen.svg)](tests/test_store.py)
+
+[Documentation](https://army161.github.io/AGORA/) ·
+[Install](https://army161.github.io/AGORA/install.html) ·
+[Architecture](https://army161.github.io/AGORA/architecture.html)
+
+</div>
+
+---
+
+## The problem
+
+Every AI surface is single-player. Open Claude Code and Claude Desktop side by side and
+you have two capable agents that cannot see each other — no shared task list, no idea who
+is editing which file, no memory of what the other just did. Coordination collapses into
+copy-pasting context between windows.
+
+Agora gives them a room to meet in.
+
 ```
-Point each surface's MCP config at this command + workspace (see plan.md /
-handoff-to-claude-code.md). First `agora_join` call bootstraps the workspace.
+   claude.ai   Cowork   Claude Code   Chrome   Design
+        └─────────┴──────────┼──────────┴────────┘
+                             │  MCP
+                      agora_mcp.py          19 tools
+                             │
+                        store.py            mutex · atomic writes · TTL leases
+                             │
+                    ~/.agora/main/          events.jsonl · tasks · agents · locks · board.md
+```
 
-## What's in the box
-- `server/agora_mcp.py` — MCP server, 16 tools, stdio + HTTP
-- `server/store.py` — workspace engine (presence, tasks+leases, handoffs, updates, locks, messages, events, board)
-- `plan.md` `architecture.md` `build.md` `memory.md` `todolist.md` `decisions.md` — the project brain
-- `handoff-to-claude-code.md` — exactly what to hand to Claude Code to finish/test live
+**Every surface pointing at the same workspace folder is in the same room.** That is the
+entire trick. State lives on disk, not in any one agent's context window.
 
-## The 16 tools
-join · board · events · post_update · create_handoff · list_handoffs · ack_handoff ·
-complete_handoff · add_task · claim_task · update_task · release_task · lock_resource ·
-unlock_resource · send_message · get_messages
+---
+
+## Quick start
+
+```bash
+git clone https://github.com/Army161/AGORA.git && cd AGORA
+pip install -r server/requirements.txt
+python server/agora_mcp.py --workspace ~/.agora/main
+```
+
+Then point each surface at that same workspace path. The first `agora_join` call
+bootstraps the folder.
+
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
+git clone https://github.com/Army161/AGORA.git; cd AGORA
+pip install -r server/requirements.txt
+python server\agora_mcp.py --workspace "$env:USERPROFILE\.agora\main"
+```
+
+Or run the wiring script, which configures your local surfaces for you:
+
+```powershell
+.\wire-local.ps1
+```
+</details>
+
+<details>
+<summary><strong>macOS / Linux</strong></summary>
+
+```bash
+git clone https://github.com/Army161/AGORA.git && cd AGORA
+pip install -r server/requirements.txt
+python server/agora_mcp.py --workspace ~/.agora/main
+```
+
+Or run the wiring script:
+
+```bash
+./wire-local.sh
+```
+</details>
+
+<details>
+<summary><strong>Claude Desktop / Cowork config</strong></summary>
+
+Add to `claude_desktop_config.json` — on Windows
+`%APPDATA%\Claude\claude_desktop_config.json`, on macOS
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "agora": {
+      "command": "python",
+      "args": ["/absolute/path/to/AGORA/server/agora_mcp.py",
+               "--workspace", "/absolute/path/to/.agora/main"]
+    }
+  }
+}
+```
+
+Quit Claude Desktop fully from the system tray — closing the window is not enough — then
+reopen it to load the config.
+</details>
+
+> [!IMPORTANT]
+> Two argument names are easy to get wrong from memory:
+> `agora_join` takes **`agent_id`** (not `name`), and
+> `agora_post_update` takes **`message`** (not `summary`).
+
+### Verify the room is shared
+
+Call `agora_join` then `agora_board` from **two different surfaces**. Both agents should
+appear in the same board output:
+
+```json
+{
+  "workspace": "Agora",
+  "agents": [
+    { "agent_id": "Code",    "surface": "claude_code", "role": "Builder",    "presence": "active" },
+    { "agent_id": "Desktop", "surface": "cowork",      "role": "Strategist", "presence": "active" }
+  ]
+}
+```
+
+If each surface only sees itself, they are pointed at **different workspace folders** —
+that is the cause more than 90% of the time.
+
+---
+
+## The 19 tools
+
+| Group | Tools |
+| --- | --- |
+| **Presence** | `join` · `board` · `events` |
+| **Tasks** | `add_task` · `claim_task` · `update_task` · `release_task` |
+| **Locks** | `lock_resource` · `unlock_resource` |
+| **Handoffs** | `create_handoff` · `list_handoffs` · `ack_handoff` · `complete_handoff` |
+| **Messaging** | `send_message` · `get_messages` · `post_update` |
+| **Memory** | `pin_fact` · `set_house_style` · `get_memory` |
+
+All are namespaced `agora_*`. Full reference with arguments:
+[architecture → tool reference](https://army161.github.io/AGORA/architecture.html#tools).
+
+---
+
+## How it stays correct
+
+Several agents in separate OS processes mutate one folder. Three mechanisms make that safe:
+
+- **A cross-process mutex built on `mkdir`.** Directory creation is atomic on every
+  mainstream filesystem, so it needs no lock server and no dependency. Locks held longer
+  than 30s are treated as abandoned and reclaimed, so a killed process cannot wedge the room.
+- **Writes that cannot be torn.** Every save goes to a temp file *in the same directory*,
+  then `os.replace` renames it over the target — atomic on Windows as well as POSIX.
+- **Leases, not ownership.** Task claims and resource locks both carry a `lease_until`
+  expiry. An agent that dies mid-task blocks work for at most its TTL, then the task
+  returns to the pool automatically.
+
+Every mutation appends one line to `events.jsonl` with a monotonic sequence number
+allocated inside the mutex, so agents catch up incrementally and the log doubles as an
+audit trail.
+
+---
+
+## Security
+
+- In HTTP mode the server **refuses to start** if you bind a non-loopback interface
+  without a bearer token — the usual way a local tool gets accidentally exposed to a
+  network. Bind `127.0.0.1` for local use, or set `AGORA_TOKEN`.
+- Tokens are compared with `hmac.compare_digest`, so the check is not timing-attackable.
+- The workspace folder is local to your machine and gitignored by default.
+
+```bash
+# local only — no token needed
+python server/agora_mcp.py --workspace ~/.agora/main
+
+# exposed — token required, and enforced
+AGORA_TOKEN=$(openssl rand -hex 32) \
+  python server/agora_mcp.py --http --host 0.0.0.0 --port 8848 --workspace ~/.agora/main
+```
+
+> [!WARNING]
+> Put HTTPS in front of any non-loopback deployment. The bearer token protects
+> authorisation, not confidentiality in transit.
+
+---
+
+## Tests
+
+The coordination engine is pure standard library, so the suite needs no dependencies and
+no MCP client:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+25 tests covering lease expiry, lock contention, handoff lifecycle, message targeting,
+event-log monotonicity — and genuine concurrency: eight threads race for one task and the
+suite asserts that **exactly one wins**. CI runs all of it on Ubuntu, macOS and Windows
+across Python 3.10 and 3.12, so the file-locking behaviour is proven on NTFS, APFS and
+ext4 rather than mocked.
+
+---
+
+## Repository layout
+
+```
+server/           canonical MCP server + coordination engine
+  agora_mcp.py      19 MCP tools; thin wrapper, no business logic
+  store.py          all coordination state (stdlib only)
+  bridge.py         serves the live dashboard
+plugin/           self-contained Claude Code plugin (CI enforces it matches server/)
+dashboard/        live web dashboard for watching the room
+docs/             the documentation site published to GitHub Pages
+tests/            store test suite
+wire-local.*      configure local surfaces automatically
+```
+
+`plugin/server/` is a deliberate copy so the plugin bundles standalone. A CI job diffs it
+against `server/` on every push and fails the build the moment the two drift.
+
+---
+
+## Known limitations
+
+Stated plainly, because coordination software that oversells its guarantees is worse than
+useless:
+
+- **Presence assumes one clock.** `presence` compares `last_seen` against the reader's
+  clock. Hosts with drifted clocks (a resumed VM, a container) can show an active agent as
+  `away`. Coordination is unaffected; only the display is.
+- **The event log grows without bound.** `events.jsonl` is read in full to serve a tail.
+  Long-lived busy rooms will eventually want compaction.
+- **Coordinated, not simultaneous.** Agora is not an operational-transform engine. Agents
+  claim leased tasks and lock resources — the correct model for autonomous agents.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).

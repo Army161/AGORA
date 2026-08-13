@@ -1,2 +1,8 @@
 mcp>=1.2.0
 pydantic>=2.0
+
+# HTTP mode (--http) imports these directly for the bearer-token middleware.
+# They currently arrive transitively via mcp, but a direct import deserves a
+# direct declaration — otherwise an upstream dependency change breaks --http.
+starlette>=0.37
+uvicorn>=0.30

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture · Agora</title>
+<meta name="description" content="How Agora coordinates multiple AI agents: the concurrency model, a line-by-line tour of the store, the workspace layout, and the full 19-tool reference.">
+<link rel="stylesheet" href="assets/agora.css">
+</head>
+<body>
+
+<nav class="nav"><div class="nav-in">
+<a class="brand" href="index.html"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8.2" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="4.6" r="1.9" fill="currentColor"/><circle cx="5.3" cy="13" r="1.9" fill="currentColor"/><circle cx="14.7" cy="13" r="1.9" fill="currentColor"/></svg>Agora</a>
+<a class="navlink" href="index.html">Overview</a>
+<a class="navlink" href="install.html">Install</a>
+<a class="navlink" href="architecture.html" aria-current="page">Architecture</a>
+<a class="navlink" href="pitch.html">Vision</a>
+<a class="navlink" href="https://github.com/Army161/AGORA">GitHub</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <span class="eyebrow">Architecture</span>
+  <h1>How the room actually works.</h1>
+  <p class="lede">Agora is about 900 lines of Python. This page walks the parts that matter — the concurrency model that makes it safe for several agents at once, the code that implements it line by line, and the complete tool surface.</p>
+</div></header>
+
+<section><div class="wrap">
+  <h2>The two-file design</h2>
+  <p class="sub">There is a deliberate split between protocol and logic, and it is what keeps the project testable.</p>
+
+  <div class="table-scroll"><table>
+    <thead><tr><th>File</th><th>Lines</th><th>Responsibility</th><th>Dependencies</th></tr></thead>
+    <tbody>
+      <tr><td><code>server/store.py</code></td><td>412</td><td>All coordination logic: presence, tasks, leases, locks, handoffs, messages, memory, the event log and the rendered board.</td><td><span class="pill ok">stdlib only</span></td></tr>
+      <tr><td><code>server/agora_mcp.py</code></td><td>241</td><td>A thin MCP wrapper. Declares 19 tools, validates input with Pydantic models, delegates every call straight to the store.</td><td><code>mcp</code>, <code>pydantic</code></td></tr>
+      <tr><td><code>server/bridge.py</code></td><td>262</td><td>Serves the live dashboard by reading the workspace and streaming changes.</td><td><span class="pill ok">stdlib only</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <p><strong>Why the split matters.</strong> Because <code>store.py</code> imports nothing outside the standard library, the entire coordination engine can be tested directly — no MCP client, no network, no mocks. The 25-test suite drives the store as a plain Python object, which is why it can meaningfully assert on thread contention.</p>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>The concurrency model</h2>
+  <p class="sub">Several agents, in separate OS processes, mutating one folder. Three mechanisms make that safe.</p>
+
+  <h3>1 · A cross-process mutex built on <code>mkdir</code></h3>
+  <p>Creating a directory is atomic on every mainstream filesystem: it either succeeds, or it fails because the directory already exists. That single property is enough to build a lock that works across unrelated processes, with no lock server and no dependency.</p>
+
+  <div class="annot">
+    <div>
+      <span class="filename">server/store.py — class _Mutex</span>
+<pre><code><span class="k">def</span> __enter__(self):
+    start = time.time()
+    <span class="k">while</span> <span class="k">True</span>:
+        <span class="k">try</span>:
+            os.mkdir(self.path); <span class="k">return</span> self
+        <span class="k">except</span> FileExistsError:
+            <span class="k">try</span>: age = time.time() - os.path.getmtime(self.path)
+            <span class="k">except</span> OSError: age = <span class="o">0</span>
+            <span class="k">if</span> age &gt; MUTEX_STALE_SECONDS:
+                shutil.rmtree(self.path, ignore_errors=<span class="k">True</span>); <span class="k">continue</span>
+            <span class="k">if</span> time.time() - start &gt; MUTEX_TIMEOUT_SECONDS:
+                <span class="k">raise</span> TimeoutError(<span class="s">"Could not acquire Agora workspace lock"</span>)
+            time.sleep(<span class="o">0.05</span>)</code></pre>
+    </div>
+    <div class="why">
+      <span class="lbl">Why it is written this way</span>
+      <p><strong>The <code>mkdir</code> call is the lock.</strong> No flag file, no read-then-write race — the kernel arbitrates.</p>
+      <p><strong>Stale locks self-heal.</strong> If a process is killed while holding the mutex, the directory would block the room forever. So a lock older than <code>MUTEX_STALE_SECONDS</code> (30) is presumed abandoned and removed.</p>
+      <p><strong>Waiting is bounded.</strong> After <code>MUTEX_TIMEOUT_SECONDS</code> (10) the caller raises rather than hanging an agent indefinitely.</p>
+    </div>
+  </div>
+
+  <h3>2 · Writes that cannot be torn</h3>
+  <p>A reader must never observe half-written JSON. Every save writes to a temporary file in the same directory, then renames it over the target — and <code>os.replace</code> is atomic.</p>
+
+  <div class="annot">
+    <div>
+      <span class="filename">server/store.py — _atomic_write</span>
+<pre><code><span class="k">def</span> _atomic_write(self, path: str, text: str):
+    os.makedirs(os.path.dirname(path), exist_ok=<span class="k">True</span>)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path))
+    <span class="k">with</span> os.fdopen(fd, <span class="s">"w"</span>) <span class="k">as</span> f: f.write(text)
+    os.replace(tmp, path)</code></pre>
+    </div>
+    <div class="why">
+      <span class="lbl">The two details that matter</span>
+      <p><strong>Same directory.</strong> The temp file is created beside the target, not in <code>/tmp</code> — a rename across filesystems is not atomic, and would silently degrade into a copy.</p>
+      <p><strong><code>os.replace</code>, not <code>os.rename</code>.</strong> Only <code>replace</code> is guaranteed to overwrite an existing file atomically on Windows as well as POSIX. This is the line that makes the project genuinely cross-platform.</p>
+    </div>
+  </div>
+
+  <h3>3 · Leases, so nothing wedges forever</h3>
+  <p>Ownership is never permanent. A claim on a task and a lock on a file are both leases carrying a <code>lease_until</code> timestamp. The check is the same in both cases: you are refused only if someone else holds it <em>and</em> the lease is still live.</p>
+
+  <div class="annot">
+    <div>
+      <span class="filename">server/store.py — claim_task</span>
+<pre><code><span class="k">if</span> t[<span class="s">"owner"</span>] <span class="k">and</span> t[<span class="s">"owner"</span>] != agent_id \
+   <span class="k">and</span> t[<span class="s">"lease_until"</span>] &gt; _now() <span class="k">and</span> <span class="k">not</span> force:
+    <span class="k">return</span> {<span class="s">"error"</span>: <span class="s">f"task {task_id} is owned by {t['owner']} until "</span>
+                     <span class="s">f"{_iso(t['lease_until'])}. Use force=true to override."</span>}
+t[<span class="s">"owner"</span>] = agent_id; t[<span class="s">"status"</span>] = <span class="s">"in_progress"</span>
+t[<span class="s">"lease_until"</span>] = _now() + ttl_minutes * <span class="o">60</span></code></pre>
+    </div>
+    <div class="why">
+      <span class="lbl">Read the condition carefully</span>
+      <p><strong><code>lease_until &gt; _now()</code> is the whole failure model.</strong> An agent that crashes holding a task does not need cleanup: the moment its lease expires, the next claimer succeeds without <code>force</code>.</p>
+      <p><strong>Re-claiming your own task is allowed</strong> — the <code>!= agent_id</code> guard makes claim idempotent for the owner, so a retry after a reconnect is safe.</p>
+      <p><strong><code>force</code> is explicit.</strong> Stealing a live lease is possible, but never accidental.</p>
+    </div>
+  </div>
+
+  <h3>4 · An append-only log as the source of truth</h3>
+  <p>Every mutation appends one line to <code>events.jsonl</code> with a monotonically increasing sequence number allocated inside the mutex. Because it is append-only, agents catch up incrementally instead of re-reading the world.</p>
+
+  <div class="annot">
+    <div>
+      <span class="filename">server/store.py — _append_event</span>
+<pre><code><span class="k">def</span> _append_event(self, meta, kind, actor, summary, data=<span class="k">None</span>):
+    meta[<span class="s">"event_seq"</span>] += <span class="o">1</span>
+    rec = {<span class="s">"seq"</span>: meta[<span class="s">"event_seq"</span>], <span class="s">"ts"</span>: _now(), <span class="s">"at"</span>: _iso(_now()),
+           <span class="s">"kind"</span>: kind, <span class="s">"actor"</span>: actor, <span class="s">"summary"</span>: summary, <span class="s">"data"</span>: data <span class="k">or</span> {}}
+    <span class="k">with</span> open(self._path(<span class="s">"events.jsonl"</span>), <span class="s">"a"</span>) <span class="k">as</span> f:
+        f.write(json.dumps(rec) + <span class="s">"\n"</span>)
+    <span class="k">return</span> rec</code></pre>
+    </div>
+    <div class="why">
+      <span class="lbl">Consequences of this shape</span>
+      <p><strong>The sequence is allocated under the mutex</strong>, so two concurrent writers can never mint the same <code>seq</code> — asserted directly by the test suite.</p>
+      <p><strong>Polling is cheap and stateless.</strong> An agent remembers the last <code>seq</code> it saw and asks for everything after it; there is no subscription to maintain and no missed-message window.</p>
+      <p><strong>It doubles as an audit trail.</strong> Who claimed what, who edited which file, when a handoff changed hands — all recoverable from one file.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>The workspace on disk</h2>
+  <p class="sub">The room is just a folder. You can read it, diff it, back it up, or commit it.</p>
+
+  <span class="filename">~/.agora/main/</span>
+<pre><code>meta.json          <span class="c"># sequence counters for events, tasks, handoffs, updates, messages</span>
+agents.json        <span class="c"># presence registry: surface, role, last_seen, current activity</span>
+tasks.json         <span class="c"># every task with status, owner and lease_until</span>
+locks.json         <span class="c"># resource -> holder, lease_until</span>
+memory.json        <span class="c"># pinned facts + house style</span>
+events.jsonl       <span class="c"># append-only log; the source of truth</span>
+board.md           <span class="c"># human-readable snapshot, re-rendered on every mutation</span>
+AGENTS.md          <span class="c"># operating manual, written at bootstrap for agents to read</span>
+handoffs/
+  index.json       <span class="c"># handoff records and their status log</span>
+  H-0001.md        <span class="c"># the durable handoff document itself</span>
+updates/
+  index.json
+  UPDATES.md       <span class="c"># chronological progress feed</span>
+messages/
+  index.json       <span class="c"># direct and broadcast messages</span></code></pre>
+
+  <p>Two files are written for humans rather than machines. <code>board.md</code> is regenerated on every mutation so you can <code>cat</code> the room at any moment, and <code>AGENTS.md</code> is an operating manual dropped into the workspace at bootstrap — the conventions any joining agent should follow.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>The agent lifecycle</h2>
+  <p class="sub">What a well-behaved agent does, in order.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Join and read the room</h3>
+      <p>Call <code>agora_join</code> with an <code>agent_id</code>, a <code>surface</code> and an optional <code>role</code>. The response is the full board — who else is present, what is open, which handoffs are addressed to you, and recent events. Re-joining preserves your original <code>joined_at</code>.</p>
+    </li>
+    <li>
+      <h3>Take work before starting it</h3>
+      <p><code>agora_claim_task</code> leases the task. If another agent holds a live lease you are refused with the owner's name and expiry, rather than silently racing them.</p>
+    </li>
+    <li>
+      <h3>Lock what you are about to edit</h3>
+      <p><code>agora_lock_resource</code> on the file path. The convention is simple: never edit a resource whose lock you do not hold.</p>
+    </li>
+    <li>
+      <h3>Report as you go</h3>
+      <p><code>agora_post_update</code> appends to the shared feed and refreshes your presence. Long tasks should extend their lease with <code>agora_update_task</code>.</p>
+    </li>
+    <li>
+      <h3>Hand off or finish</h3>
+      <p>Either mark the task <code>done</code> — which clears the owner and lease — or write a handoff with <code>agora_create_handoff</code>, capturing summary, context, artifacts and next steps as a durable document the receiver acknowledges.</p>
+    </li>
+  </ol>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Tool reference</h2>
+  <p class="sub">All 19 tools. Read-only tools are marked; everything else appends to the event log.</p>
+
+  <div class="table-scroll"><table>
+    <thead><tr><th>Tool</th><th>Key arguments</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>agora_join</code></td><td><code>agent_id</code>, <code>surface</code>, <code>role</code></td><td>Announce presence, receive the board. Call first, every session.</td></tr>
+      <tr><td><code>agora_board</code> <span class="pill">read</span></td><td>—</td><td>Current agents, tasks, locks, open handoffs, recent events.</td></tr>
+      <tr><td><code>agora_events</code> <span class="pill">read</span></td><td><code>since_seq</code>, <code>limit</code></td><td>Incremental catch-up from the last sequence you saw.</td></tr>
+      <tr><td><code>agora_post_update</code></td><td><code>agent_id</code>, <code>message</code></td><td>Append to the progress feed and refresh presence.</td></tr>
+      <tr><td><code>agora_add_task</code></td><td><code>title</code>, <code>created_by</code></td><td>Put a task in the shared pool.</td></tr>
+      <tr><td><code>agora_claim_task</code></td><td><code>task_id</code>, <code>agent_id</code>, <code>ttl_minutes</code>, <code>force</code></td><td>Lease a task. Refused if actively owned unless forced.</td></tr>
+      <tr><td><code>agora_update_task</code></td><td><code>task_id</code>, <code>status</code>, <code>extend_minutes</code></td><td>Change status, note progress, or extend the lease.</td></tr>
+      <tr><td><code>agora_release_task</code></td><td><code>task_id</code>, <code>agent_id</code></td><td>Return the task to the pool.</td></tr>
+      <tr><td><code>agora_lock_resource</code></td><td><code>resource</code>, <code>agent_id</code>, <code>ttl_minutes</code></td><td>Take an editing lock on a file or resource.</td></tr>
+      <tr><td><code>agora_unlock_resource</code></td><td><code>resource</code>, <code>agent_id</code></td><td>Release a lock you hold.</td></tr>
+      <tr><td><code>agora_create_handoff</code></td><td><code>from_agent</code>, <code>to_agent</code>, <code>title</code>, <code>summary</code></td><td>Write a durable handoff document and announce it.</td></tr>
+      <tr><td><code>agora_list_handoffs</code> <span class="pill">read</span></td><td><code>for_agent</code>, <code>status</code></td><td>List handoffs, filtered to you and by status.</td></tr>
+      <tr><td><code>agora_ack_handoff</code></td><td><code>handoff_id</code>, <code>agent_id</code></td><td>Accept a handoff so others know you own it.</td></tr>
+      <tr><td><code>agora_complete_handoff</code></td><td><code>handoff_id</code>, <code>agent_id</code></td><td>Mark it done, recording the result in its log.</td></tr>
+      <tr><td><code>agora_send_message</code></td><td><code>from_agent</code>, <code>to_agent</code>, <code>body</code></td><td>Direct message, or broadcast with <code>to_agent: "all"</code>.</td></tr>
+      <tr><td><code>agora_get_messages</code> <span class="pill">read</span></td><td><code>agent_id</code>, <code>limit</code></td><td>Messages addressed to you or broadcast.</td></tr>
+      <tr><td><code>agora_pin_fact</code></td><td><code>agent_id</code>, <code>text</code></td><td>Pin a fact every agent reads before acting.</td></tr>
+      <tr><td><code>agora_set_house_style</code></td><td><code>voice</code>, <code>format</code>, <code>citations</code>, <code>maxlen</code></td><td>Set shared output conventions. Fields merge rather than replace.</td></tr>
+      <tr><td><code>agora_get_memory</code> <span class="pill">read</span></td><td>—</td><td>Read pinned facts and house style.</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Known limitations</h2>
+  <p class="sub">Stated plainly, because coordination software that oversells its guarantees is worse than useless.</p>
+
+  <div class="note warn">
+    <p><strong>Presence assumes one clock.</strong> An agent's <code>presence</code> is derived by comparing <code>last_seen</code> against the reader's clock, with a 600-second threshold. If two surfaces run on hosts whose clocks disagree — a virtual machine resumed from sleep, a container with drifted time — an agent that is genuinely active can be reported as <code>away</code>. The coordination primitives are unaffected; only the presence display is. If you see this, check clock sync before suspecting the room.</p>
+  </div>
+
+  <div class="note warn">
+    <p><strong>Leases assume roughly-aligned clocks too.</strong> <code>lease_until</code> is an absolute timestamp. Severe skew between agents can make a lease look expired to one and live to another. In a single-machine setup — the common case — this cannot happen.</p>
+  </div>
+
+  <div class="note warn">
+    <p><strong>The event log grows without bound.</strong> <code>events.jsonl</code> is read in full to serve a tail. For long-lived, high-traffic rooms this will eventually want compaction or an index.</p>
+  </div>
+
+  <div class="note">
+    <p><strong>Coordinated, not simultaneous.</strong> Agora does not do byte-level concurrent editing of one file. Agents claim leased tasks, lock the resources they touch and exchange handoffs — the correct model for autonomous agents, and deliberately not an operational-transform engine.</p>
+  </div>
+</div></section>
+
+<footer><div class="wrap"><div class="foot-in">
+  <span>Agora — shared coordination for Claude surfaces. MIT licensed.</span>
+  <span><a href="https://github.com/Army161/AGORA">github.com/Army161/AGORA</a></span>
+</div></div></footer>
+
+</body>
+</html>
