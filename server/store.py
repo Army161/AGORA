@@ -50,15 +50,20 @@ class AgoraStore:
 
     # ---------- low-level ----------
     def _path(self, *p): return os.path.join(self.root, *p)
+    # Every file handle below pins encoding="utf-8" explicitly. Without it Python
+    # uses the platform default — cp1252 on a typical Windows box — which cannot
+    # encode emoji, CJK or Cyrillic. An agent posting "shipped 🚀" would raise
+    # UnicodeEncodeError and fail the whole call, and a workspace written on
+    # Windows would not read back correctly on macOS or Linux.
     def _atomic_write(self, path: str, text: str):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path))
-        with os.fdopen(fd, "w") as f: f.write(text)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: f.write(text)
         os.replace(tmp, path)
     def _load(self, name: str, default: Any):
         p = self._path(name)
         if not os.path.exists(p): return default
-        with open(p) as f: return json.load(f)
+        with open(p, encoding="utf-8") as f: return json.load(f)
     def _save(self, name: str, obj: Any):
         self._atomic_write(self._path(name), json.dumps(obj, indent=2))
     def _mutex(self): return _Mutex(self.lockdir)
@@ -95,7 +100,7 @@ class AgoraStore:
         meta["event_seq"] += 1
         rec = {"seq": meta["event_seq"], "ts": _now(), "at": _iso(_now()),
                "kind": kind, "actor": actor, "summary": summary, "data": data or {}}
-        with open(self._path("events.jsonl"), "a") as f:
+        with open(self._path("events.jsonl"), "a", encoding="utf-8") as f:
             f.write(json.dumps(rec) + "\n")
         return rec
 
@@ -103,7 +108,7 @@ class AgoraStore:
         out = []
         p = self._path("events.jsonl")
         if not os.path.exists(p): return out
-        with open(p) as f:
+        with open(p, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line: continue
@@ -163,7 +168,7 @@ class AgoraStore:
                    "task_id": task_id, "tags": tags or [], "at": _iso(_now())}
             idx = self._load("updates/index.json", [])
             idx.append(rec); self._save("updates/index.json", idx)
-            with open(self._path("updates", "UPDATES.md"), "a") as f:
+            with open(self._path("updates", "UPDATES.md"), "a", encoding="utf-8") as f:
                 tg = f"  _{', '.join(tags)}_" if tags else ""
                 tk = f" (task {task_id})" if task_id else ""
                 f.write(f"- **{rec['at']}** — `{agent_id}`{tk}: {message}{tg}\n")

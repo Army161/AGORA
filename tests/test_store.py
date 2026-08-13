@@ -212,6 +212,47 @@ class TestMemory(AgoraTestCase):
         self.assertEqual(style["format"], "markdown")
 
 
+class TestEncoding(AgoraTestCase):
+    """Regression: file handles must pin UTF-8, not the platform default.
+
+    On a stock Windows box the default is cp1252, which cannot encode emoji,
+    CJK or Cyrillic — so an agent posting "shipped 🚀" raised UnicodeEncodeError
+    and failed the entire call.
+    """
+
+    SAMPLES = ["shipped 🚀", "完了しました", "готово", "café naïve", "→ ✓ — …"]
+
+    def test_non_latin_text_round_trips(self):
+        self.s.join("a1", "claude_code", "Builder")
+        for text in self.SAMPLES:
+            with self.subTest(text=text):
+                self.s.post_update("a1", text)
+        feed = os.path.join(self.root, "updates", "UPDATES.md")
+        with open(feed, encoding="utf-8") as f:
+            body = f.read()
+        for text in self.SAMPLES:
+            self.assertIn(text, body)
+
+    def test_workspace_files_are_utf8(self):
+        """A room written on one platform must be readable on any other."""
+        self.s.join("a1", "claude_code", "Builder")
+        self.s.add_task("ship 🚀 the 完了 build", "a1")
+        self.s.create_handoff("a1", "any", "Ünicode — handoff", "готово")
+        for name in ("board.md", "tasks.json", "events.jsonl", "AGENTS.md"):
+            path = os.path.join(self.root, name)
+            with self.subTest(file=name):
+                with open(path, "rb") as f:
+                    raw = f.read()
+                raw.decode("utf-8")  # raises UnicodeDecodeError if not UTF-8
+
+    def test_non_latin_survives_reload(self):
+        self.s.join("a1", "claude_code", "Builder")
+        tid = self.s.add_task("ship 🚀", "a1")["id"]
+        reopened = AgoraStore(self.root, "Test Workspace")
+        self.assertEqual(reopened.summary()["tasks"][0]["title"], "ship 🚀")
+        self.assertEqual(tid, "T-0001")
+
+
 class TestConcurrency(AgoraTestCase):
     def test_only_one_thread_wins_a_contested_claim(self):
         """The mutex must make claim_task a genuine critical section."""
