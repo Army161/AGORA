@@ -1,4 +1,6 @@
-mcp>=1.2.0
+# >=1.9.0: earliest version with the mcp.server.auth OAuth 2.1 module
+# (Dynamic Client Registration + PKCE) used by --oauth / start-web-connector.
+mcp>=1.9.0
 pydantic>=2.0
 
 # HTTP mode (--http) imports these directly for the bearer-token middleware.
