@@ -11,7 +11,7 @@ and reading the same append-only event log.
 [![CI](https://github.com/Army161/AGORA/actions/workflows/ci.yml/badge.svg)](https://github.com/Army161/AGORA/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-25%20passing-brightgreen.svg)](tests/test_store.py)
+[![Tests](https://img.shields.io/badge/tests-28%20passing-brightgreen.svg)](tests/test_store.py)
 
 [Documentation](https://army161.github.io/AGORA/) ·
 [Install](https://army161.github.io/AGORA/install.html) ·
@@ -204,9 +204,9 @@ no MCP client:
 python -m unittest discover -s tests -v
 ```
 
-25 tests covering lease expiry, lock contention, handoff lifecycle, message targeting,
-event-log monotonicity — and genuine concurrency: eight threads race for one task and the
-suite asserts that **exactly one wins**. CI runs all of it on Ubuntu, macOS and Windows
+28 tests covering lease expiry, lock contention, handoff lifecycle, message targeting,
+event-log monotonicity, UTF-8 round-tripping — and genuine concurrency: eight threads race
+for one task and the suite asserts that **exactly one wins**. CI runs all of it on Ubuntu, macOS and Windows
 across Python 3.10 and 3.12, so the file-locking behaviour is proven on NTFS, APFS and
 ext4 rather than mocked.
 
@@ -236,16 +236,4 @@ against `server/` on every push and fails the build the moment the two drift.
 Stated plainly, because coordination software that oversells its guarantees is worse than
 useless:
 
-- **Presence assumes one clock.** `presence` compares `last_seen` against the reader's
-  clock. Hosts with drifted clocks (a resumed VM, a container) can show an active agent as
-  `away`. Coordination is unaffected; only the display is.
-- **The event log grows without bound.** `events.jsonl` is read in full to serve a tail.
-  Long-lived busy rooms will eventually want compaction.
-- **Coordinated, not simultaneous.** Agora is not an operational-transform engine. Agents
-  claim leased tasks and lock resources — the correct model for autonomous agents.
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+- **Presence assumes o

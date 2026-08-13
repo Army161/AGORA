@@ -38,7 +38,7 @@
   </table></div>
 
   <div class="note">
-    <p><strong>Why the split matters.</strong> Because <code>store.py</code> imports nothing outside the standard library, the entire coordination engine can be tested directly — no MCP client, no network, no mocks. The 25-test suite drives the store as a plain Python object, which is why it can meaningfully assert on thread contention.</p>
+    <p><strong>Why the split matters.</strong> Because <code>store.py</code> imports nothing outside the standard library, the entire coordination engine can be tested directly — no MCP client, no network, no mocks. The 28-test suite drives the store as a plain Python object, which is why it can meaningfully assert on thread contention.</p>
   </div>
 </div></section>
 
