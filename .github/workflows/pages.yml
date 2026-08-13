@@ -1,0 +1,99 @@
+name: Deploy docs to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify every docs page is well-formed
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          from html.parser import HTMLParser
+
+          # Void elements never need closing; everything else must balance.
+          VOID = {"area","base","br","col","embed","hr","img","input","link",
+                  "meta","param","source","track","wbr"}
+
+          class Check(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.stack, self.problems = [], []
+              def handle_starttag(self, tag, attrs):
+                  if tag not in VOID:
+                      self.stack.append(tag)
+              def handle_endtag(self, tag):
+                  if tag in VOID:
+                      return
+                  if not self.stack:
+                      self.problems.append(f"stray </{tag}>")
+                  elif self.stack[-1] == tag:
+                      self.stack.pop()
+                  elif tag in self.stack:
+                      while self.stack and self.stack[-1] != tag:
+                          self.problems.append(f"unclosed <{self.stack.pop()}>")
+                      if self.stack:
+                          self.stack.pop()
+                  else:
+                      self.problems.append(f"stray </{tag}>")
+
+          failed = False
+          for page in sorted(pathlib.Path("docs").rglob("*.html")):
+              c = Check()
+              c.feed(page.read_text(encoding="utf-8"))
+              problems = c.problems + [f"unclosed <{t}>" for t in c.stack]
+              if problems:
+                  failed = True
+                  print(f"::error file={page}::{'; '.join(problems[:8])}")
+              else:
+                  print(f"ok  {page}")
+
+          # A relative href pointing at a file we did not ship is a dead link.
+          docs = pathlib.Path("docs")
+          import re
+          for page in sorted(docs.rglob("*.html")):
+              html = page.read_text(encoding="utf-8")
+              for href in re.findall(r'(?:href|src)="([^"#:]+)"', html):
+                  if href.startswith(("http", "//", "mailto:", "#")):
+                      continue
+                  if not (page.parent / href).exists():
+                      failed = True
+                      print(f"::error file={page}::broken local link -> {href}")
+
+          sys.exit(1 if failed else 0)
+          PY
+
+      # Jekyll would otherwise swallow any path beginning with an underscore.
+      - name: Disable Jekyll processing
+        run: touch docs/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

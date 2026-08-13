@@ -3,8 +3,13 @@
 Run local (stdio, for Claude Code / Desktop / Cowork):
     python agora_mcp.py --workspace ~/.agora/myproject
 Run remote (HTTP, required for claude.ai web connectors):
-    python agora_mcp.py --http --host 0.0.0.0 --port 8848 --workspace ~/.agora/myproject
-    python agora_mcp.py --http --token mysecret ...   # add auth before exposing publicly
+    # A non-loopback bind REQUIRES a token — the server refuses to start without one.
+    AGORA_TOKEN=$(openssl rand -hex 32) \
+      python agora_mcp.py --http --host 0.0.0.0 --port 8848 --workspace ~/.agora/myproject
+
+    # Loopback-only needs no token, but note that putting a tunnel in front of a
+    # loopback bind exposes it publicly without tripping that guard — set a token there too.
+    python agora_mcp.py --http --host 127.0.0.1 --port 8848 --workspace ~/.agora/myproject
 
 Every connected surface that points at the SAME workspace shares one room.
 """

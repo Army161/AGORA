@@ -49,7 +49,7 @@ def load_settings():
     s = dict(SETTINGS_DEFAULT)
     if os.path.exists(p):
         try:
-            s.update(json.load(open(p)))
+            s.update(json.load(open(p, encoding="utf-8")))
         except Exception:
             pass
     s["workspace"] = STORE.root
