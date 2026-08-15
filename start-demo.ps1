@@ -175,14 +175,32 @@ if ($Tunnel -eq 'tailscale') {
   # The disabled-tailnet case is the common one and it does not surface as a
   # non-zero exit — the command simply never returns. Detect it by content.
   if ($fn.Output -match 'Funnel is not enabled') {
+    # Funnel has TWO prerequisites and reports the same message for both:
+    # the `funnel` node attribute in the tailnet policy, and HTTPS certificate
+    # provisioning. Probe for a cert to tell them apart — otherwise this sends
+    # people to edit an ACL that is already correct.
+    $cert = Invoke-Tailscale -Arguments @('cert', $dns) -TimeoutSec 45
+    if ($cert.Output -match 'does not support getting TLS certs') {
+      Bad "HTTPS certificates are not enabled for this tailnet."
+      Write-Host ""
+      Hint "Funnel terminates TLS for your .ts.net hostname, so it needs cert"
+      Hint "provisioning turned on. Enable it here (one toggle):"
+      Write-Host "    https://login.tailscale.com/admin/dns" -ForegroundColor Cyan
+      Hint "-> HTTPS Certificates -> Enable HTTPS"
+      Write-Host ""
+      Hint "This is a DIFFERENT setting from the funnel node attribute."
+      exit 1
+    }
+
     Bad "Funnel is not enabled for this tailnet."
     Write-Host ""
-    Hint "Enable it once, here:"
+    Hint "Grant the 'funnel' node attribute in your tailnet policy:"
+    Write-Host "    https://login.tailscale.com/admin/acls/file" -ForegroundColor Cyan
+    Hint 'add:  "nodeAttrs": [{"target": ["autogroup:member"], "attr": ["funnel"]}],'
     $link = if ($fn.Output -match '(https://login\.tailscale\.com/f/funnel\S*)') { $Matches[1] } else { $null }
-    if ($link) { Write-Host "    $link" -ForegroundColor Cyan }
-    else       { foreach ($l in ($fn.Output -split "`n" | Where-Object { $_.Trim() })) { Hint $l.Trim() } }
+    if ($link) { Hint "or use the one-click link:"; Write-Host "    $link" -ForegroundColor Cyan }
     Write-Host ""
-    Hint "Then re-run this script. Nothing else needs changing."
+    Hint "Then re-run this script. Remember to SAVE the policy file."
     exit 1
   }
 

@@ -14,3 +14,9 @@ build/
 *.local.json
 .env
 .env.*
+
+# TLS material. `tailscale cert` writes the cert AND private key into the
+# working directory, which is often the repo root. Never let that be committed.
+*.crt
+*.key
+*.pem
