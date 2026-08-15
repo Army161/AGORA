@@ -42,6 +42,36 @@ function Ok($t)   { Write-Host "  OK   $t" -ForegroundColor Green }
 function Bad($t)  { Write-Host "  FAIL $t" -ForegroundColor Red }
 function Hint($t) { Write-Host "       $t" -ForegroundColor Yellow }
 
+# `tailscale funnel` does NOT exit when Funnel is disabled for the tailnet: it
+# prints an enablement link and then blocks, polling for someone to click it.
+# Called naively that wedges this script forever, so every tailscale invocation
+# is bounded and has stdin closed (nothing here should ever await input).
+function Invoke-Tailscale {
+  param([string[]]$Arguments, [int]$TimeoutSec = 20)
+
+  $stdin  = Join-Path $env:TEMP "agora-ts-empty.in"
+  $stdout = Join-Path $env:TEMP "agora-ts-out.txt"
+  $stderr = Join-Path $env:TEMP "agora-ts-err.txt"
+  New-Item -ItemType File -Path $stdin -Force | Out-Null
+  Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
+
+  $p = Start-Process -FilePath $TS -ArgumentList $Arguments `
+        -RedirectStandardInput $stdin -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
+
+  $exited = $p.WaitForExit($TimeoutSec * 1000)
+  if (-not $exited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+
+  $out = ((Get-Content $stdout -Raw -ErrorAction SilentlyContinue) + "`n" +
+          (Get-Content $stderr -Raw -ErrorAction SilentlyContinue)).Trim()
+
+  [pscustomobject]@{
+    TimedOut = -not $exited
+    ExitCode = $(if ($exited) { $p.ExitCode } else { $null })
+    Output   = $out
+  }
+}
+
 # ---------------------------------------------------------------- teardown --
 function Stop-Stack {
   if (Test-Path $StateFile) {
@@ -60,7 +90,14 @@ function Stop-Stack {
   Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   # Funnel is a persistent serve-config on the tailnet, not a process — turning
   # it off matters, or the hostname keeps answering after the server is gone.
-  if (Test-Path $TS) { & $TS funnel --https=443 off 2>$null | Out-Null }
+  # Only attempt it when a serve config actually exists: with Funnel disabled
+  # for the tailnet, even `funnel off` blocks on the enablement prompt.
+  if (Test-Path $TS) {
+    $st = Invoke-Tailscale -Arguments @('funnel','status') -TimeoutSec 10
+    if (-not $st.TimedOut -and $st.Output -notmatch 'No serve config') {
+      Invoke-Tailscale -Arguments @('funnel','--https=443','off') -TimeoutSec 10 | Out-Null
+    }
+  }
 }
 
 if ($Stop) {
@@ -133,12 +170,25 @@ if ($Tunnel -eq 'tailscale') {
   Ok "tailnet hostname: $dns"
 
   Info "Enabling Funnel on port $Port ..."
-  $funnelOut = & $TS funnel --bg $Port 2>&1 | Out-String
-  if ($LASTEXITCODE -ne 0) {
-    Bad "could not enable Funnel."
-    foreach ($line in ($funnelOut -split "`n" | Where-Object { $_.Trim() })) { Hint $line.Trim() }
-    Hint "Funnel needs HTTPS certificates and the 'funnel' node attribute enabled"
-    Hint "for your tailnet. The output above usually contains a link that does both."
+  $fn = Invoke-Tailscale -Arguments @('funnel','--bg',"$Port") -TimeoutSec 25
+
+  # The disabled-tailnet case is the common one and it does not surface as a
+  # non-zero exit — the command simply never returns. Detect it by content.
+  if ($fn.Output -match 'Funnel is not enabled') {
+    Bad "Funnel is not enabled for this tailnet."
+    Write-Host ""
+    Hint "Enable it once, here:"
+    $link = if ($fn.Output -match '(https://login\.tailscale\.com/f/funnel\S*)') { $Matches[1] } else { $null }
+    if ($link) { Write-Host "    $link" -ForegroundColor Cyan }
+    else       { foreach ($l in ($fn.Output -split "`n" | Where-Object { $_.Trim() })) { Hint $l.Trim() } }
+    Write-Host ""
+    Hint "Then re-run this script. Nothing else needs changing."
+    exit 1
+  }
+
+  if ($fn.TimedOut -or ($null -ne $fn.ExitCode -and $fn.ExitCode -ne 0)) {
+    Bad "could not enable Funnel$(if ($fn.TimedOut) { ' (timed out)' })."
+    foreach ($l in ($fn.Output -split "`n" | Where-Object { $_.Trim() })) { Hint $l.Trim() }
     exit 1
   }
   Ok "funnel active -> $PublicUrl"
