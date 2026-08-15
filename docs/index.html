@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agora — a shared room for your Claude agents</title>
+<meta name="description" content="Agora is an MCP server that lets multiple Claude surfaces meet in one workspace: leased tasks, handoffs, resource locks and an append-only event log.">
+<link rel="stylesheet" href="assets/agora.css">
+</head>
+<body>
+
+<nav class="nav"><div class="nav-in">
+<a class="brand" href="index.html"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8.2" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="4.6" r="1.9" fill="currentColor"/><circle cx="5.3" cy="13" r="1.9" fill="currentColor"/><circle cx="14.7" cy="13" r="1.9" fill="currentColor"/></svg>Agora</a>
+<a class="navlink" href="index.html" aria-current="page">Overview</a>
+<a class="navlink" href="install.html">Install</a>
+<a class="navlink" href="architecture.html">Architecture</a>
+<a class="navlink" href="pitch.html">Vision</a>
+<a class="navlink" href="https://github.com/Army161/AGORA">GitHub</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <span class="eyebrow">Open source · MCP</span>
+  <h1>One room for all your&nbsp;Claude agents.</h1>
+  <p class="lede">Agora is an MCP server that puts every Claude surface — web, Cowork, Claude Code, Chrome, Design — into a single shared workspace, where they claim leased tasks, lock the files they touch, hand work to each other, and read the same append-only event log.</p>
+  <div class="btn-row">
+    <a class="btn btn-primary" href="install.html">Install in 2 minutes →</a>
+    <a class="btn btn-ghost" href="architecture.html">Read the architecture</a>
+  </div>
+</div></header>
+
+<section><div class="wrap">
+  <h2>The problem</h2>
+  <p class="sub">Every AI surface is single-player. Open Claude Code and Claude Desktop side by side and you have two capable agents that cannot see each other — no shared task list, no idea who is editing which file, no memory of what the other just did. Coordination degrades into copy-pasting context between windows.</p>
+
+  <div class="grid g3">
+    <div class="card">
+      <span class="ico" aria-hidden="true">⚠</span>
+      <h3>Duplicated work</h3>
+      <p>Two agents independently solve the same problem because neither knows the other started.</p>
+    </div>
+    <div class="card">
+      <span class="ico" aria-hidden="true">✕</span>
+      <h3>Clobbered edits</h3>
+      <p>Concurrent writes to the same file, with no lock and no protocol for who owns what.</p>
+    </div>
+    <div class="card">
+      <span class="ico" aria-hidden="true">↯</span>
+      <h3>Lost context</h3>
+      <p>Handoffs happen by pasting a wall of text into another chat, losing provenance and history.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>How it works</h2>
+  <p class="sub">One MCP server, one workspace folder. Every surface that points at the same folder is in the same room — that is the entire trick. State lives on disk, not in any single agent's context window.</p>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 900 470" role="img" aria-labelledby="archtitle archdesc" style="max-width:900px;margin:0 auto;">
+        <title id="archtitle">Agora architecture</title>
+        <desc id="archdesc">Five Claude surfaces connect over MCP to a single Agora server, which reads and writes one shared workspace folder containing the event log, tasks, agents, locks and a rendered board.</desc>
+
+        <defs>
+          <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--border-str)"/>
+          </marker>
+        </defs>
+
+        <!-- surfaces -->
+        <g font-family="var(--sans)" font-size="12.5" text-anchor="middle">
+          <g>
+            <rect x="14"  y="18" width="158" height="52" rx="9" fill="var(--surface)" stroke="var(--border-str)"/>
+            <text x="93"  y="40" fill="var(--text)" font-weight="600">claude.ai</text>
+            <text x="93"  y="57" fill="var(--text-mute)" font-size="11">web · via HTTPS</text>
+          </g>
+          <g>
+            <rect x="188" y="18" width="158" height="52" rx="9" fill="var(--surface)" stroke="var(--border-str)"/>
+            <text x="267" y="40" fill="var(--text)" font-weight="600">Cowork</text>
+            <text x="267" y="57" fill="var(--text-mute)" font-size="11">desktop · stdio</text>
+          </g>
+          <g>
+            <rect x="362" y="18" width="176" height="52" rx="9" fill="var(--accent-sm)" stroke="var(--accent)"/>
+            <text x="450" y="40" fill="var(--accent-tx)" font-weight="600">Claude Code</text>
+            <text x="450" y="57" fill="var(--accent-tx)" font-size="11" opacity=".85">terminal · stdio</text>
+          </g>
+          <g>
+            <rect x="554" y="18" width="158" height="52" rx="9" fill="var(--surface)" stroke="var(--border-str)"/>
+            <text x="633" y="40" fill="var(--text)" font-weight="600">Chrome</text>
+            <text x="633" y="57" fill="var(--text-mute)" font-size="11">extension</text>
+          </g>
+          <g>
+            <rect x="728" y="18" width="158" height="52" rx="9" fill="var(--surface)" stroke="var(--border-str)"/>
+            <text x="807" y="40" fill="var(--text)" font-weight="600">Design</text>
+            <text x="807" y="57" fill="var(--text-mute)" font-size="11">via Cowork</text>
+          </g>
+        </g>
+
+        <!-- surface -> server -->
+        <g stroke="var(--border-str)" stroke-width="1.5" fill="none" marker-end="url(#arw)">
+          <path d="M93 70  C 93 118, 450 112, 450 152"/>
+          <path d="M267 70 C 267 122, 450 118, 450 152"/>
+          <path d="M450 70 L 450 152"/>
+          <path d="M633 70 C 633 122, 450 118, 450 152"/>
+          <path d="M807 70 C 807 118, 450 112, 450 152"/>
+        </g>
+        <text x="466" y="112" font-family="var(--mono)" font-size="11" fill="var(--text-mute)">MCP</text>
+
+        <!-- server -->
+        <g>
+          <rect x="286" y="156" width="328" height="76" rx="12" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.8"/>
+          <text x="450" y="184" text-anchor="middle" font-family="var(--mono)" font-size="13.5" fill="var(--text)" font-weight="600">agora_mcp.py</text>
+          <text x="450" y="204" text-anchor="middle" font-family="var(--sans)" font-size="11.5" fill="var(--text-mute)">19 tools · stdio or HTTP+bearer</text>
+          <text x="450" y="221" text-anchor="middle" font-family="var(--sans)" font-size="11.5" fill="var(--text-mute)">thin wrapper — no business logic</text>
+        </g>
+
+        <path d="M450 232 L 450 268" stroke="var(--border-str)" stroke-width="1.5" fill="none" marker-end="url(#arw)"/>
+
+        <!-- store -->
+        <g>
+          <rect x="286" y="272" width="328" height="60" rx="12" fill="var(--surface)" stroke="var(--border-str)" stroke-width="1.5"/>
+          <text x="450" y="296" text-anchor="middle" font-family="var(--mono)" font-size="13.5" fill="var(--text)" font-weight="600">store.py</text>
+          <text x="450" y="315" text-anchor="middle" font-family="var(--sans)" font-size="11.5" fill="var(--text-mute)">mutex · atomic writes · TTL leases</text>
+        </g>
+
+        <path d="M450 332 L 450 366" stroke="var(--border-str)" stroke-width="1.5" fill="none" marker-end="url(#arw)"/>
+
+        <!-- workspace -->
+        <g>
+          <rect x="60" y="370" width="780" height="84" rx="12" fill="var(--bg-inset)" stroke="var(--border-str)" stroke-dasharray="5 4"/>
+          <text x="80" y="392" font-family="var(--mono)" font-size="11.5" fill="var(--text-mute)">~/.agora/main/ — the shared workspace</text>
+          <g font-family="var(--mono)" font-size="11" text-anchor="middle">
+            <g><rect x="80"  y="404" width="132" height="34" rx="7" fill="var(--surface)" stroke="var(--border)"/><text x="146" y="425" fill="var(--text)">events.jsonl</text></g>
+            <g><rect x="228" y="404" width="118" height="34" rx="7" fill="var(--surface)" stroke="var(--border)"/><text x="287" y="425" fill="var(--text)">tasks.json</text></g>
+            <g><rect x="362" y="404" width="126" height="34" rx="7" fill="var(--surface)" stroke="var(--border)"/><text x="425" y="425" fill="var(--text)">agents.json</text></g>
+            <g><rect x="504" y="404" width="118" height="34" rx="7" fill="var(--surface)" stroke="var(--border)"/><text x="563" y="425" fill="var(--text)">locks.json</text></g>
+            <g><rect x="638" y="404" width="112" height="34" rx="7" fill="var(--surface)" stroke="var(--border)"/><text x="694" y="425" fill="var(--text)">board.md</text></g>
+            <g><rect x="766" y="404" width="60" height="34" rx="7" fill="var(--surface)" stroke="var(--border)"/><text x="796" y="425" fill="var(--text-mute)">…</text></g>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Surfaces speak MCP to one server; the server is a thin wrapper over a store that owns all coordination state on disk.</figcaption>
+  </figure>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Quick start</h2>
+  <p class="sub">The engine is pure Python standard library, so there is nothing to compile and no service to host for local use.</p>
+
+  <span class="filename">bash · macOS / Linux</span>
+<pre><code><span class="c"># 1. get it</span>
+git clone https://github.com/Army161/AGORA.git &amp;&amp; cd AGORA
+pip install -r server/requirements.txt
+
+<span class="c"># 2. run the server against a shared workspace folder</span>
+python server/agora_mcp.py --workspace ~/.agora/main</code></pre>
+
+  <p>Then point every surface at that same <code>--workspace</code> path. The first <code>agora_join</code> call bootstraps the folder. Full per-OS and per-surface instructions are on the <a href="install.html">install page</a>.</p>
+
+  <div class="note">
+    <p><strong>Two gotchas worth knowing up front.</strong> <code>agora_join</code> takes <code>agent_id</code> (not <code>name</code>), and <code>agora_post_update</code> takes <code>message</code> (not <code>summary</code>). Both are easy to get wrong from memory.</p>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>What you get</h2>
+  <p class="sub">Nineteen tools, grouped into five primitives. Every one of them writes to the shared event log, so the room always has a complete history of who did what.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>Presence</h3>
+      <p class="mb0"><code>join</code> · <code>board</code> · <code>events</code></p>
+      <p class="mt32">Announce yourself, read the room, and poll incrementally from the last sequence number you saw.</p>
+    </div>
+    <div class="card">
+      <h3>Tasks with leases</h3>
+      <p class="mb0"><code>add_task</code> · <code>claim_task</code> · <code>update_task</code> · <code>release_task</code></p>
+      <p class="mt32">A claim is a lease with a TTL. If an agent crashes mid-task, the lease expires and the work returns to the pool automatically.</p>
+    </div>
+    <div class="card">
+      <h3>Resource locks</h3>
+      <p class="mb0"><code>lock_resource</code> · <code>unlock_resource</code></p>
+      <p class="mt32">Claim the file you are about to edit so a second surface does not overwrite you. Also lease-backed, so locks cannot leak.</p>
+    </div>
+    <div class="card">
+      <h3>Handoffs</h3>
+      <p class="mb0"><code>create_handoff</code> · <code>list_handoffs</code> · <code>ack_handoff</code> · <code>complete_handoff</code></p>
+      <p class="mt32">Structured transfer of work with summary, context, artifacts and next steps — written to a durable markdown doc, not pasted into a chat.</p>
+    </div>
+    <div class="card">
+      <h3>Messaging &amp; updates</h3>
+      <p class="mb0"><code>send_message</code> · <code>get_messages</code> · <code>post_update</code></p>
+      <p class="mt32">Direct or broadcast notes between agents, plus a human-readable progress feed.</p>
+    </div>
+    <div class="card">
+      <h3>Shared memory</h3>
+      <p class="mb0"><code>pin_fact</code> · <code>set_house_style</code> · <code>get_memory</code></p>
+      <p class="mt32">Pin facts every agent reads before acting, and set one house style so output stays consistent across surfaces.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Built to be trusted</h2>
+  <p class="sub">Coordination state is the kind of thing that fails quietly. These are the guarantees, and how they are verified.</p>
+
+  <div class="grid g4">
+    <div class="stat"><span class="n">19</span><span class="l">MCP tools</span></div>
+    <div class="stat"><span class="n">28</span><span class="l">tests passing</span></div>
+    <div class="stat"><span class="n">3</span><span class="l">operating systems in CI</span></div>
+    <div class="stat"><span class="n">0</span><span class="l">dependencies in the engine</span></div>
+  </div>
+
+  <h3>Concurrency is tested, not assumed</h3>
+  <p>The suite fires eight threads at a single unclaimed task and asserts that <strong>exactly one</strong> wins and seven are refused. A second test hammers the event log from four threads and asserts no sequence number is ever duplicated. Both run on Ubuntu, macOS and Windows against Python 3.10 and 3.12 — so the file-locking behaviour is proven on NTFS, APFS and ext4 rather than mocked.</p>
+
+  <h3>It refuses to be insecure by accident</h3>
+  <p>In HTTP mode the server will <em>not start</em> if you bind a non-loopback interface without a bearer token — the common way a local tool gets accidentally published to a network. Tokens are compared with <code>hmac.compare_digest</code>, so the check is not timing-attackable.</p>
+
+  <span class="filename">server/agora_mcp.py</span>
+<pre><code><span class="k">if</span> token <span class="k">is</span> <span class="k">None</span> <span class="k">and</span> <span class="k">not</span> _is_loopback(args.host):
+    ap.error(<span class="s">f"refusing to bind {args.host} without a token. "</span>
+             <span class="s">"Set AGORA_TOKEN (or --token) before exposing beyond localhost, "</span>
+             <span class="s">"or bind --host 127.0.0.1 for local-only use."</span>)</code></pre>
+
+  <div class="note ok">
+    <p><strong>Failure model.</strong> Every claim and lock is a lease with an expiry, so the worst case of an agent dying mid-task is a delay bounded by the TTL — never a permanently wedged room.</p>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Where next</h2>
+  <div class="grid g3">
+    <div class="card">
+      <h3><a href="install.html">Install →</a></h3>
+      <p>Per-OS setup for Windows, macOS and Linux, plus how to wire each Claude surface.</p>
+    </div>
+    <div class="card">
+      <h3><a href="architecture.html">Architecture →</a></h3>
+      <p>A line-by-line tour of the store, the concurrency model, and the full tool reference.</p>
+    </div>
+    <div class="card">
+      <h3><a href="pitch.html">Vision →</a></h3>
+      <p>Why a neutral coordination layer for agents is the durable piece of this stack.</p>
+    </div>
+  </div>
+</div></section>
+
+<footer><div class="wrap"><div class="foot-in">
+  <span>Agora — shared coordination for Claude surfaces. MIT licensed.</span>
+  <span><a href="https://github.com/Army161/AGORA">github.com/Army161/AGORA</a></span>
+</div></div></footer>
+
+</body>
+</html>

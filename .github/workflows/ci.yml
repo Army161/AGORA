@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }} / py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # store.py is pure stdlib on purpose — the engine tests need no install.
+      # This is what lets the same suite prove the file-locking behaviour on
+      # NTFS, APFS and ext4 without mocking the filesystem.
+      - name: Run store test suite
+        run: python -m unittest discover -s tests -v
+
+  imports:
+    name: MCP server imports cleanly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install server requirements
+        run: pip install -r server/requirements.txt
+      - name: Import server and assert the tool surface
+        run: |
+          cd server
+          python - <<'PY'
+          import agora_mcp
+          names = sorted(t.name for t in agora_mcp.mcp._tool_manager.list_tools())
+          print(f"{len(names)} tools registered:")
+          for n in names:
+              print("  -", n)
+          assert len(names) == 19, f"expected 19 tools, found {len(names)}"
+          assert all(n.startswith("agora_") for n in names), "all tools must be namespaced agora_*"
+          PY
+
+  plugin-in-sync:
+    name: plugin server matches server/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # plugin/server/ is a deliberate self-contained copy so the Claude Code
+      # plugin bundles standalone. That copy is only safe if it can never drift,
+      # so fail loudly the moment it does.
+      - name: Diff plugin server against canonical server
+        run: |
+          status=0
+          for f in store.py agora_mcp.py bridge.py requirements.txt; do
+            if ! diff -u "server/$f" "plugin/server/$f"; then
+              echo "::error file=plugin/server/$f::plugin/server/$f has drifted from server/$f"
+              status=1
+            fi
+          done
+          if [ $status -eq 0 ]; then echo "plugin server is in sync with server/"; fi
+          exit $status

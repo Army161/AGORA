@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Workspace — Agora</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3eee6; --bg2:#e9e1d4; --panel:#fffdf9; --panel2:#f6f0e7; --raise:#fffefb;
+  --ink:#2a2520; --ink2:#534a40; --muted:#857a6c; --line:#e6ddce; --line2:#d8cdbb;
+  --accent:#c1572f; --accent2:#a8431f; --accent-ink:#fff;
+  --ok:#3f7350; --warn:#9a6a1c; --bad:#a83c22; --info:#7a52a8;
+  /* Categorical (agent-surface) palette — validated: node dataviz/scripts/validate_palette.js
+     "#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300" --mode light --surface "#fffdf9" → ALL PASS.
+     Order matters (CVD-safety), keep it. Avatar text always uses --a-ink (near-black), never
+     white — several of these slots are too light for white text to clear contrast. */
+  --a-blue:#2a78d6; --a-orange:#eb6834; --a-aqua:#1baf7a; --a-yellow:#eda100; --a-magenta:#e87ba4; --a-green:#008300;
+  --a-ink:#1c130c;
+  --shadow:0 1px 2px rgba(60,40,20,.06),0 8px 24px rgba(60,40,20,.06);
+  --radius:14px; --radius-sm:9px;
+  --font-display:'Fraunces',Georgia,serif; --font-sans:'IBM Plex Sans',system-ui,sans-serif; --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+[data-theme="dark"]{
+  --bg:#15120e; --bg2:#0f0d0a; --panel:#211d17; --panel2:#1a1611; --raise:#262019;
+  --ink:#efe7db; --ink2:#cabfae; --muted:#9a8f80; --line:#322b22; --line2:#3f372b;
+  --accent:#e0875f; --accent2:#eda078; --accent-ink:#1c130c;
+  --ok:#7fb389; --warn:#d7a657; --bad:#e6886a; --info:#b491de;
+  /* validated: "#3987e5,#d95926,#199e70,#c98500,#d55181,#008300" --mode dark --surface "#211d17" → ALL PASS */
+  --a-blue:#3987e5; --a-orange:#d95926; --a-aqua:#199e70; --a-yellow:#c98500; --a-magenta:#d55181; --a-green:#008300;
+  --a-ink:#1c130c;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 14px 40px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:var(--font-sans);background:var(--bg);color:var(--ink);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+body:before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background:radial-gradient(1100px 600px at 78% -8%, color-mix(in srgb,var(--accent) 13%,transparent), transparent 60%),
+             radial-gradient(900px 500px at -6% 108%, color-mix(in srgb,var(--a-aqua) 10%,transparent), transparent 55%);}
+body:after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.035;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+::selection{background:color-mix(in srgb,var(--accent) 40%,transparent)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:20px;border:3px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+button{font-family:inherit;cursor:pointer;color:inherit;border:none;background:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--font-mono)}
+
+/* shell */
+#app{position:relative;z-index:1;display:grid;height:100vh;
+  grid-template-columns:264px 1fr;grid-template-rows:58px 1fr;
+  grid-template-areas:"side top" "side main"}
+.side{grid-area:side;background:var(--panel2);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0}
+.top{grid-area:top;background:color-mix(in srgb,var(--panel) 75%,transparent);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:14px;padding:0 18px}
+.main{grid-area:main;overflow:auto;padding:26px 30px 60px;min-height:0}
+
+/* brand */
+.brand{display:flex;align-items:center;gap:11px;padding:16px 18px 12px}
+.glyph{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(145deg,var(--accent),var(--accent2));color:var(--accent-ink);
+  font-family:var(--font-display);font-weight:600;font-size:17px;box-shadow:var(--shadow)}
+.brand h1{font-family:var(--font-display);font-size:18px;font-weight:600;margin:0;letter-spacing:.2px}
+.brand .sub{font-size:11px;color:var(--muted);margin-top:1px;letter-spacing:.3px}
+
+.wsswitch{margin:4px 14px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);
+  background:var(--panel);padding:9px 11px;display:flex;align-items:center;gap:9px;font-size:12.5px}
+.wsswitch .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
+.wsswitch b{font-weight:600}
+.wsswitch .chev{margin-left:auto;color:var(--muted)}
+
+.navlabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted);
+  padding:14px 20px 6px;font-weight:600}
+.nav{display:flex;flex-direction:column;gap:1px;padding:0 10px}
+.nav button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  padding:9px 11px;border-radius:9px;font-size:13.5px;color:var(--ink2);transition:.15s}
+.nav button:hover{background:var(--panel)}
+.nav button.on{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--ink);font-weight:500}
+.nav button.on svg{color:var(--accent)}
+.nav svg{width:17px;height:17px;flex:none;color:var(--muted)}
+.nav .kbd{margin-left:auto;font-size:10px;color:var(--muted);opacity:.7}
+.nav .badge{margin-left:auto;background:var(--accent);color:var(--accent-ink);font-size:10px;
+  font-weight:600;border-radius:20px;padding:1px 7px;min-width:18px;text-align:center}
+
+.agents-scroll{flex:1;overflow:auto;padding-bottom:10px;min-height:0}
+.agentrow{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:1px 10px;border-radius:10px;
+  cursor:pointer;transition:.15s;border:1px solid transparent}
+.agentrow:hover{background:var(--panel)}
+.agentrow.on{background:var(--panel);border-color:var(--line)}
+.av{width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;
+  font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--a-ink);position:relative}
+.av .pres{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;
+  border:2px solid var(--panel2)}
+.pres.active{background:var(--ok)}.pres.away{background:var(--warn)}.pres.left{background:var(--muted)}
+.agentrow .nm{font-size:12.5px;font-weight:500;line-height:1.2}
+.agentrow .rl{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+
+/* topbar */
+.top .vtitle{font-family:var(--font-display);font-size:17px;font-weight:600}
+.top .crumb{color:var(--muted);font-size:12.5px}
+.spacer{flex:1}
+.kpiticker{display:flex;gap:18px;align-items:center;padding-right:6px}
+.kpiticker .kp{display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.kpiticker .kp b{font-family:var(--font-mono);font-size:15px;font-weight:500}
+.kpiticker .kp span{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:3px}
+.iconbtn{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--ink2);transition:.15s}
+.iconbtn:hover{background:var(--panel2);color:var(--ink)}
+.iconbtn svg{width:18px;height:18px}
+.connpill{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);
+  border:1px solid var(--line);border-radius:20px;padding:5px 11px}
+.connpill .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2.4s infinite}
+.connpill.off .dot{background:var(--bad);animation:none}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 50%,transparent)}50%{box-shadow:0 0 0 5px transparent}}
+.cmdk{display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:9px;padding:7px 11px;color:var(--muted);font-size:12.5px;min-width:180px;transition:.15s}
+.cmdk:hover{border-color:var(--line2)}
+.cmdk .kbd{margin-left:auto}
+.kbd{font-family:var(--font-mono);font-size:10.5px;background:var(--panel);border:1px solid var(--line2);
+  border-radius:5px;padding:1px 5px;color:var(--ink2)}
+
+/* generic */
+h2.sec{font-family:var(--font-display);font-size:22px;font-weight:600;margin:0 0 3px}
+.lede{color:var(--muted);font-size:13px;margin:0 0 22px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.pad{padding:18px}
+.row{display:flex;gap:14px}.col{display:flex;flex-direction:column;gap:14px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-ink);
+  font-weight:600;font-size:13px;padding:9px 15px;border-radius:9px;transition:.15s;box-shadow:var(--shadow)}
+.btn:hover{filter:brightness(1.06);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:6px 11px;font-size:12px}
+.btn svg{width:15px;height:15px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;
+  padding:3px 9px;border-radius:20px;border:1px solid var(--line2);color:var(--ink2);background:var(--panel2)}
+.chip.tag{font-family:var(--font-mono);font-size:10.5px}
+.st{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-transform:capitalize}
+/* Status chips use the reserved status set (ok/warn/bad/info), never a categorical
+   agent-surface hue — keeps "what state is this in" visually distinct from "who owns it". */
+.st.todo{background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--ink2)}
+.st.in_progress{background:color-mix(in srgb,var(--info) 20%,transparent);color:var(--info)}
+.st.blocked{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.st.review{background:color-mix(in srgb,var(--info) 20%,transparent);color:var(--info)}
+.st.done{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.st.open{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.st.acked{background:color-mix(in srgb,var(--info) 20%,transparent);color:var(--info)}
+
+/* room hero — everyone in this room, one room, no cap on how many show */
+.roomhero{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.roomhero .rh-title{font-family:var(--font-display);font-size:22px;font-weight:600}
+.roomhero .rh-count{font-family:var(--font-mono);font-size:13px;color:var(--muted);
+  background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 11px}
+.agentgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:26px}
+.agentcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:14px 16px;display:flex;gap:12px;align-items:flex-start;
+  transition:.15s;cursor:pointer}
+.agentcard:hover{border-color:var(--line2);transform:translateY(-1px)}
+.agentcard .av{width:38px;height:38px;border-radius:11px;font-size:13px}
+.agentcard .av .pres{width:11px;height:11px;border:2px solid var(--panel)}
+.agentcard .ac-body{min-width:0;flex:1}
+.agentcard .ac-name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px}
+.agentcard .ac-surface{font-size:11px;color:var(--muted);margin-top:1px}
+.agentcard .ac-current{font-size:12px;color:var(--ink2);margin-top:9px;padding-top:9px;
+  border-top:1px solid var(--line);display:flex;align-items:flex-start;gap:6px}
+.agentcard .ac-current svg{width:12px;height:12px;flex:none;margin-top:2px;color:var(--muted)}
+.agentcard .ac-meta{font-size:10.5px;color:var(--muted);margin-top:7px;font-family:var(--font-mono)}
+.agentcard .ac-presdot{font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;
+  text-transform:capitalize}
+.agentcard .ac-presdot:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.agentcard .ac-presdot.active{color:var(--ok)}.agentcard .ac-presdot.away{color:var(--warn)}.agentcard .ac-presdot.left{color:var(--muted)}
+.addagent{border:1.5px dashed var(--line2);background:transparent;box-shadow:none;
+  display:flex;align-items:center;justify-content:center;gap:8px;min-height:96px;color:var(--muted);
+  font-size:12.5px;text-align:center;flex-direction:column}
+.addagent:hover{border-color:var(--accent);color:var(--accent)}
+.addagent svg{width:20px;height:20px}
+
+/* KPI grid */
+.kpigrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.kpi{position:relative;overflow:hidden}
+.kpi .pad{padding:16px 18px}
+.kpi .lab{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.kpi .val{font-family:var(--font-display);font-size:34px;font-weight:600;line-height:1.1;margin-top:6px}
+.kpi .delta{font-size:11.5px;margin-top:4px;font-family:var(--font-mono)}
+.kpi .delta.up{color:var(--ok)}.kpi .delta.down{color:var(--bad)}
+.kpi .spark{position:absolute;right:14px;bottom:12px;opacity:.5}
+.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+  font-weight:600;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+thead th:hover{color:var(--ink)}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--line)}
+tbody tr{transition:.12s}tbody tr:hover{background:var(--panel2)}
+tbody tr:last-child td{border-bottom:none}
+.lease{font-family:var(--font-mono);font-size:12px}
+.lease.warn{color:var(--warn)}.lease.bad{color:var(--bad)}
+
+/* panes (workspace) */
+.panes{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+.pane{display:flex;flex-direction:column;min-height:230px;overflow:hidden}
+.pane .ph{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line)}
+.pane .ph .nm{font-weight:600;font-size:13.5px}.pane .ph .rl{font-size:11px;color:var(--muted)}
+.pane .body{padding:14px 15px;flex:1;display:flex;flex-direction:column;gap:10px}
+.pane .cur{font-size:12.5px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.pane .cur .t{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
+.feeditem{font-size:12px;color:var(--ink2);display:flex;gap:8px}
+.feeditem .when{color:var(--muted);font-family:var(--font-mono);font-size:10.5px;white-space:nowrap}
+.pane .acts{display:flex;gap:7px;margin-top:auto;padding-top:6px}
+.barwrap{height:5px;background:var(--panel2);border-radius:20px;overflow:hidden;margin-top:2px}
+.bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:20px;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+
+/* threads */
+.thread{padding:14px 16px;border-bottom:1px solid var(--line);cursor:pointer;transition:.12s}
+.thread:hover{background:var(--panel2)}
+.thread .tt{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:8px}
+.thread .meta{font-size:11.5px;color:var(--muted);margin-top:3px}
+.thread .prev{font-size:12.5px;color:var(--ink2);margin-top:6px}
+.msg{display:flex;gap:10px;padding:10px 0}
+.msg .body{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:9px 12px;font-size:12.5px}
+.msg .who{font-size:11px;color:var(--muted);margin-bottom:3px}
+
+/* memory dock */
+.dock{position:fixed;top:0;right:0;bottom:0;width:360px;background:var(--panel);border-left:1px solid var(--line);
+  z-index:40;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .32s cubic-bezier(.2,.8,.2,1);box-shadow:-20px 0 50px rgba(0,0,0,.16)}
+.dock.open{transform:none}
+.dock .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.dock .dh h3{font-family:var(--font-display);font-size:16px;margin:0;font-weight:600}
+.dock .dbody{flex:1;overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:16px}
+.pin{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:12.5px}
+.pin .by{font-size:10.5px;color:var(--muted);margin-top:6px;font-family:var(--font-mono)}
+.style-field{display:flex;flex-direction:column;gap:5px}
+.style-field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+input,select,textarea{font-family:inherit;font-size:13px;background:var(--panel2);border:1px solid var(--line2);
+  color:var(--ink);border-radius:9px;padding:9px 11px;width:100%;transition:.15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--panel)}
+textarea{resize:vertical;min-height:64px;line-height:1.5}
+
+/* empty / skeleton */
+.empty{text-align:center;padding:54px 20px;color:var(--muted)}
+.empty .ic{width:46px;height:46px;margin:0 auto 14px;opacity:.5}
+.empty h4{font-family:var(--font-display);font-size:17px;color:var(--ink);margin:0 0 5px;font-weight:600}
+.sk{background:linear-gradient(90deg,var(--panel2) 25%,var(--line) 37%,var(--panel2) 63%);
+  background-size:400% 100%;animation:sh 1.4s infinite;border-radius:7px}
+@keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+
+/* overlays */
+.scrim{position:fixed;inset:0;background:rgba(10,8,5,.5);backdrop-filter:blur(3px);z-index:50;
+  opacity:0;pointer-events:none;transition:.2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.palette{position:fixed;left:50%;top:14vh;transform:translateX(-50%) scale(.97);width:min(560px,92vw);z-index:60;
+  background:var(--panel);border:1px solid var(--line2);border-radius:16px;box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:.2s;overflow:hidden}
+.palette.on{opacity:1;pointer-events:auto;transform:translateX(-50%) scale(1)}
+.palette input{border:none;border-bottom:1px solid var(--line);border-radius:0;padding:16px 18px;font-size:15px;background:transparent}
+.palette .results{max-height:340px;overflow:auto;padding:8px}
+.palette .res{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;font-size:13.5px;cursor:pointer}
+.palette .res.sel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.palette .res .k{margin-left:auto;font-size:10.5px;color:var(--muted)}
+.palette .res svg{width:16px;height:16px;color:var(--muted)}
+
+/* toasts */
+.toasts{position:fixed;right:20px;bottom:20px;z-index:70;display:flex;flex-direction:column;gap:10px}
+.toast{background:var(--panel);border:1px solid var(--line2);border-left:3px solid var(--accent);
+  border-radius:11px;padding:12px 15px;box-shadow:var(--shadow);font-size:13px;min-width:240px;max-width:340px;
+  animation:slidein .3s cubic-bezier(.2,.8,.2,1)}
+.toast.ok{border-left-color:var(--ok)}.toast.bad{border-left-color:var(--bad)}
+.toast .tt{font-weight:600;margin-bottom:2px}
+@keyframes slidein{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+
+/* view enter animation */
+.view>*{animation:rise .5s both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.stagger>*{animation:rise .5s both}
+.stagger>*:nth-child(1){animation-delay:.02s}.stagger>*:nth-child(2){animation-delay:.06s}
+.stagger>*:nth-child(3){animation-delay:.1s}.stagger>*:nth-child(4){animation-delay:.14s}
+.stagger>*:nth-child(5){animation-delay:.18s}.stagger>*:nth-child(6){animation-delay:.22s}
+
+.menutoggle{display:none}
+@media(max-width:1040px){
+  #app{grid-template-columns:0 1fr}
+  .side{position:fixed;left:0;top:0;bottom:0;width:264px;z-index:55;transform:translateX(-102%);transition:.3s}
+  .side.open{transform:none;box-shadow:var(--shadow)}
+  .menutoggle{display:grid}
+  .kpigrid{grid-template-columns:repeat(2,1fr)}
+  .kpiticker{display:none}
+}
+@media(max-width:620px){.kpigrid{grid-template-columns:1fr}.main{padding:18px}.dock{width:100%}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside class="side" id="side">
+    <div class="brand">
+      <div class="glyph">✦</div>
+      <div><h1>Workspace</h1><div class="sub">AGORA · MULTI-AGENT</div></div>
+    </div>
+    <div class="wsswitch" role="button" tabindex="0" data-act="switchws">
+      <span class="dot"></span><b id="wsname">landing-redesign</b>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><path d="m6 9 6 6 6-6"/></svg>
+    </div>
+    <div class="navlabel">Workspace</div>
+    <nav class="nav" id="nav"></nav>
+    <div class="navlabel" id="agentslabel">Agents</div>
+    <div class="agents-scroll" id="agentlist"></div>
+  </aside>
+
+  <header class="top">
+    <button class="iconbtn menutoggle" data-act="menu" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+    <div><div class="vtitle" id="vtitle">Overview</div></div>
+    <div class="spacer"></div>
+    <div class="kpiticker" id="ticker"></div>
+    <div class="connpill" id="conn"><span class="dot"></span><span id="connlabel">Live · demo</span></div>
+    <button class="cmdk" data-act="palette"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>Search & commands</span><span class="kbd">⌘K</span></button>
+    <button class="iconbtn" data-act="memory" aria-label="Shared memory" title="Shared context (M)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0 0 8v1a4 4 0 0 0 8 0v-1a4 4 0 0 0 0-8V7a4 4 0 0 0-4-4Z"/></svg></button>
+    <button class="iconbtn" data-act="theme" aria-label="Theme" title="Toggle theme (T)">
+      <svg id="themeic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg></button>
+  </header>
+
+  <main class="main"><div id="view" class="view"></div></main>
+</div>
+
+<aside class="dock" id="dock">
+  <div class="dh">
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" width="19"><path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0 0 8v1a4 4 0 0 0 8 0v-1a4 4 0 0 0 0-8V7a4 4 0 0 0-4-4Z"/></svg>
+    <h3>Shared Context</h3>
+    <div class="spacer"></div>
+    <button class="iconbtn" data-act="memory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="dbody" id="dockbody"></div>
+</aside>
+
+<div class="scrim" id="scrim" data-act="closeall"></div>
+<div class="palette" id="palette">
+  <input id="palinput" placeholder="Jump to a view, agent, or run a command…" autocomplete="off">
+  <div class="results" id="palresults"></div>
+</div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+"use strict";
+/* ---------- icons ---------- */
+const I = {
+  grid:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
+  panes:'<path d="M3 3h18v18H3z"/><path d="M12 3v18M3 12h9"/>',
+  tasks:'<path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  thread:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  mem:'<path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0 0 8v1a4 4 0 0 0 8 0v-1a4 4 0 0 0 0-8V7a4 4 0 0 0-4-4Z"/>',
+  log:'<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h6"/>',
+  set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
+  bolt:'<path d="M13 2 3 14h8l-1 8 10-12h-8z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  send:'<path d="m22 2-7 20-4-9-9-4z"/>',
+  route:'<circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6"/>',
+  hand:'<path d="M9 11V6a2 2 0 0 1 4 0v5M13 7a2 2 0 0 1 4 0v6a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6 2 2 0 0 1 4 0"/>'
+};
+const svg=(p,w=18)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="${w}" height="${w}">${p}</svg>`;
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- DATA ADAPTER (mirrors Agora store; swap for live .agora in Phase 6) ---------- */
+const now=()=>Date.now();
+const mins=m=>m*60000;
+const ACCENTS={claude_code:'--a-blue',design:'--a-orange',cowork:'--a-aqua',claude_ai:'--a-yellow',chrome:'--a-magenta',other:'--a-green',claude:'--a-blue'};
+let SEQ=40;
+function seed(){
+  const t0=now();
+  const agents=[
+    {id:'claude',name:'Claude',surface:'claude',role:'Orchestrator',presence:'active',current:'Routing the backlog',load:2},
+    {id:'code-1',name:'Claude Code',surface:'claude_code',role:'Builder',presence:'active',current:'T-0002 · build hero section',load:1},
+    {id:'cowork-1',name:'Claude Co-Pilot',surface:'cowork',role:'Strategist',presence:'active',current:'T-0001 · copy + IA',load:1},
+    {id:'chat-1',name:'Claude Chat',surface:'claude_ai',role:'Researcher',presence:'away',current:'idle',load:0},
+    {id:'design-1',name:'Claude Design',surface:'design',role:'Designer',presence:'active',current:'T-0003 · visual system',load:1},
+    {id:'chrome-1',name:'Claude Browser',surface:'chrome',role:'Operator',presence:'away',current:'idle',load:0},
+  ];
+  const tasks=[
+    {id:'T-0001',title:'Information architecture + hero copy',status:'in_progress',owner:'cowork-1',lease_until:t0+mins(22),tags:['copy','ia'],created_by:'claude',created_at:t0-mins(40)},
+    {id:'T-0002',title:'Build responsive hero section',status:'in_progress',owner:'code-1',lease_until:t0+mins(12),tags:['frontend','build'],created_by:'claude',created_at:t0-mins(35)},
+    {id:'T-0003',title:'Visual system: color, type, spacing tokens',status:'in_progress',owner:'design-1',lease_until:t0+mins(38),tags:['design'],created_by:'claude',created_at:t0-mins(33)},
+    {id:'T-0004',title:'Competitor scan: 5 landing pages',status:'review',owner:'chat-1',lease_until:0,tags:['research'],created_by:'claude',created_at:t0-mins(60)},
+    {id:'T-0005',title:'Wire CTA form + analytics events',status:'todo',owner:null,lease_until:0,tags:['frontend','build'],created_by:'claude',created_at:t0-mins(8)},
+    {id:'T-0006',title:'QA pass across breakpoints in browser',status:'todo',owner:null,lease_until:0,tags:['qa','browser'],created_by:'claude',created_at:t0-mins(5)},
+    {id:'T-0007',title:'Pricing section copy',status:'blocked',owner:null,lease_until:0,tags:['copy'],created_by:'cowork-1',created_at:t0-mins(15)},
+  ];
+  const handoffs=[
+    {id:'H-0001',from:'chat-1',to:'cowork-1',title:'Competitor findings → messaging',status:'acked',summary:'5 pages scanned; common pattern is outcome-led headlines. Recommend we lead with the time-saved metric.',created_at:t0-mins(50)},
+    {id:'H-0002',from:'design-1',to:'code-1',title:'Hero tokens ready',status:'open',summary:'Color + type + spacing tokens published. Use --space scale and the clay accent for primary CTA.',created_at:t0-mins(18)},
+    {id:'H-0003',from:'cowork-1',to:'any',title:'Pricing copy blocked on tier decision',status:'open',summary:'Need final tier names before pricing section copy can proceed.',created_at:t0-mins(12)},
+  ];
+  const updates=[
+    {id:'U-0009',agent:'code-1',message:'Hero markup scaffolded, wiring tokens next',task_id:'T-0002',at:t0-mins(6)},
+    {id:'U-0008',agent:'design-1',message:'Published spacing scale + clay accent',task_id:'T-0003',at:t0-mins(14)},
+    {id:'U-0007',agent:'cowork-1',message:'Headline locked: lead with time-saved',task_id:'T-0001',at:t0-mins(20)},
+    {id:'U-0006',agent:'chat-1',message:'Competitor scan complete, handed to Co-Pilot',task_id:'T-0004',at:t0-mins(48)},
+  ];
+  const messages=[
+    {id:'M-0004',from:'claude',to:'all',body:'House style is live — please follow it on all copy and UI.',at:t0-mins(30)},
+    {id:'M-0003',from:'design-1',to:'code-1',body:'CTA uses the clay accent, not the blue. Token: --accent.',at:t0-mins(16)},
+    {id:'M-0002',from:'cowork-1',to:'claude',body:'Pricing is blocked — need tier names from you.',at:t0-mins(11)},
+  ];
+  const events=[];
+  let s=10;
+  [['join','claude','Claude (orchestrator) joined',55],['task_add','claude','T-0001 created',40],
+   ['task_claim','cowork-1','cowork-1 claimed T-0001',39],['task_add','claude','T-0002 created',35],
+   ['handoff','chat-1','H-0001 chat-1→cowork-1',50],['task_update','chat-1','T-0004 → review',47],
+   ['update','design-1','published spacing scale',14],['handoff','design-1','H-0002 design-1→code-1',18],
+   ['lock','code-1','locked src/hero.html',7],['update','code-1','hero markup scaffolded',6]
+  ].forEach(([k,a,sm,mm])=>events.push({seq:s++,kind:k,actor:a,summary:sm,at:t0-mins(mm)}));
+  const memory={pinned:[
+    {id:'P1',text:'Goal: ship a landing page that leads with the time-saved metric.',by:'claude',at:t0-mins(55)},
+    {id:'P2',text:'Brand: warm, confident, no hype words. Clay accent (--accent) for primary CTA only.',by:'design-1',at:t0-mins(33)},
+    {id:'P3',text:'Decision: single-column hero, social proof above the fold.',by:'cowork-1',at:t0-mins(20)},
+  ],style:{voice:'Warm, plain, confident — no hype words',format:'Sentence case. Short sentences.',citations:'Link claims to the competitor scan (H-0001)',maxlen:'Hero headline ≤ 9 words'}};
+  return {agents,tasks,handoffs,updates,messages,events,memory,
+    settings:{theme:'dark',density:'comfortable',autoroute:true,workspace:'~/projects/landing-redesign/.agora',
+      rules:[{tag:'frontend',surface:'claude_code'},{tag:'build',surface:'claude_code'},{tag:'design',surface:'design'},
+             {tag:'copy',surface:'cowork'},{tag:'ia',surface:'cowork'},{tag:'research',surface:'claude_ai'},
+             {tag:'browser',surface:'chrome'},{tag:'qa',surface:'chrome'}]}};
+}
+const Adapter={
+  async load(){ try{ const r=await fetch(BRIDGE+'/state',{cache:'no-store'}); if(r.ok){ LIVE=true; return await r.json(); } }catch(e){} LIVE=false; await wait(500); return seed(); }
+};
+async function commit(action,payload){ if(!LIVE)return; try{ await fetch(BRIDGE+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload:payload||{}})}); S=await Adapter.load(); render(); }catch(e){ toast('Sync failed','bad',e.message);} }
+let _stateHash=null;
+async function refreshLive(){ try{ const r=await fetch(BRIDGE+'/state',{cache:'no-store'}); if(r.ok){ setConn(true); const data=await r.json(); const h=JSON.stringify(data); if(h===_stateHash) return; /* nothing changed → don't touch the DOM (no flash) */ _stateHash=h; S=data; renderTicker(); render(true); } }catch(e){ setConn(false);} }
+function setConn(live){ const c=$('#conn'); if(c)c.classList.toggle('off',!live); const l=$('#connlabel'); if(l)l.textContent=live?'Live · connected':'Live · demo'; }
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const BRIDGE=(new URLSearchParams(location.search)).get('bridge')||(location.protocol==='file:'?'http://localhost:8849':location.origin);
+let LIVE=false;
+
+/* ---------- app state ---------- */
+let S=null, VIEW='overview', FOCUS=null, sortKey='created_at', sortDir=-1, palSel=0, loaded=false;
+const VIEWS=[
+  {id:'overview',name:'Overview',icon:I.grid,key:'1'},
+  {id:'workspace',name:'Workspace',icon:I.panes,key:'2'},
+  {id:'tasks',name:'Task Queue',icon:I.tasks,key:'3'},
+  {id:'threads',name:'Threads',icon:I.thread,key:'4'},
+  {id:'memory',name:'Shared Memory',icon:I.mem,key:'5'},
+  {id:'logs',name:'Execution Log',icon:I.log,key:'6'},
+  {id:'settings',name:'Settings',icon:I.set,key:'7'},
+];
+const agent=id=>S.agents.find(a=>a.id===id);
+const ac=a=>`var(${ACCENTS[a?a.surface:'other']||'--a-green'})`;
+const initials=a=>a.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+function presence(a){return a.presence;}
+function timeAgo(ts){const s=(now()-ts)/1000;if(s<60)return Math.floor(s)+'s';if(s<3600)return Math.floor(s/60)+'m';return Math.floor(s/3600)+'h';}
+function leaseLeft(ts){if(!ts)return null;const ms=ts-now();if(ms<=0)return'expired';const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);return m+':'+String(s).padStart(2,'0');}
+
+/* ---------- KPIs ---------- */
+function kpis(){
+  const a=S.agents.filter(x=>x.presence==='active').length;
+  const open=S.tasks.filter(t=>t.status!=='done').length;
+  const prog=S.tasks.filter(t=>t.status==='in_progress').length;
+  const ho=S.handoffs.filter(h=>h.status!=='done').length;
+  const done=S.tasks.filter(t=>t.status==='done').length;
+  return {active:a,open,prog,handoffs:ho,done,events:S.events.length};
+}
+
+/* ---------- render: shell ---------- */
+function renderNav(){
+  $('#nav').innerHTML=VIEWS.map(v=>{
+    const badge=v.id==='threads'?S.handoffs.filter(h=>h.status==='open').length:0;
+    return `<button class="${v.id===VIEW?'on':''}" data-view="${v.id}">${svg(v.icon,17)}<span>${v.name}</span>${badge?`<span class="badge">${badge}</span>`:`<span class="kbd">${v.key}</span>`}</button>`;
+  }).join('');
+}
+function renderAgents(){
+  $('#agentlist').innerHTML=S.agents.map(a=>`
+    <div class="agentrow ${FOCUS===a.id?'on':''}" data-agent="${a.id}">
+      <div class="av" style="background:${ac(a)}">${initials(a)}<span class="pres ${presence(a)}"></span></div>
+      <div style="min-width:0"><div class="nm">${esc(a.name)}</div><div class="rl">${esc(a.current)}</div></div>
+    </div>`).join('');
+  const lab=$('#agentslabel'); if(lab)lab.textContent=`Agents · ${S.agents.length}`;
+  const ws=$('#wsname'); if(ws)ws.textContent=roomName();
+}
+function roomName(){
+  const w=S.settings&&S.settings.workspace;
+  if(!w)return'Agora';
+  return w.replace(/[\\/]+$/,'').split(/[\\/]/).pop()||w;
+}
+function renderTicker(){
+  const k=kpis();
+  $('#ticker').innerHTML=[['active','Active'],['open','Open'],['prog','Running'],['handoffs','Handoffs']]
+    .map(([key,lab])=>`<div class="kp"><b data-kpi="${key}">${k[key]}</b><span>${lab}</span></div>`).join('');
+}
+
+/* ---------- views ---------- */
+const SURFACE_LABEL={claude_code:'Claude Code',cowork:'Cowork / Desktop',claude_ai:'claude.ai (web)',design:'Claude Design',chrome:'Chrome extension',other:'Other',claude:'Claude'};
+function vOverview(){
+  const k=kpis();
+  const cards=[['Open tasks',k.open,'-2','up'],['In progress',k.prog,'+1','up'],
+    ['Open handoffs',k.handoffs,'0','up'],['Events logged',k.events,'','up']];
+  const recent=[...S.events].slice(-8).reverse();
+  return `<div class="stagger">
+    <div><h2 class="sec">Overview</h2><p class="lede">One shared room: ${esc(roomName())} · everyone below is reading and writing the same workspace</p></div>
+
+    <div class="roomhero">
+      <div class="rh-title">Agents in this room</div>
+      <div class="rh-count">${S.agents.length} connected</div>
+    </div>
+    <div class="agentgrid">
+      ${S.agents.map(agentCard).join('')}
+      <div class="card agentcard addagent" data-act="howtoconnect">
+        ${svg(I.plus,20)}<span>Connect another surface<br>(Design, Chrome, claude.ai…)</span>
+      </div>
+    </div>
+
+    <div class="kpigrid">${cards.map(([l,v,d,dir])=>`
+      <div class="card kpi"><div class="pad"><div class="lab">${l}</div>
+      <div class="val" data-kpiv="${l}">${v}</div>${d?`<div class="delta ${dir}">${d} vs last hr</div>`:'<div class="delta">&nbsp;</div>'}
+      <svg class="spark" width="56" height="22" viewBox="0 0 56 22"><polyline fill="none" stroke="${'var(--accent)'}" stroke-width="2" points="0,16 9,12 18,14 27,7 36,9 45,4 56,6"/></svg></div></div>`).join('')}
+    </div>
+    <div class="card"><div class="pad" style="padding-bottom:6px"><b style="font-family:var(--font-display);font-size:15px">Live activity</b></div>
+      <table><thead><tr><th>When</th><th>Event</th><th>Actor</th><th>Type</th></tr></thead><tbody id="actbody">
+      ${recent.length?recent.map(rowEvent).join(''):''}</tbody></table>
+      ${recent.length?'':emptyState('No activity yet','Once agents join and work, it shows up here.')}
+    </div></div>`;
+}
+function agentCard(a){
+  const joined=a.joined_at?timeAgo(a.joined_at):null;
+  const surfLabel=SURFACE_LABEL[a.surface]||a.surface;
+  return `<div class="card agentcard" data-agent="${a.id}">
+    <div class="av" style="background:${ac(a)}">${initials(a)}<span class="pres ${presence(a)}"></span></div>
+    <div class="ac-body">
+      <div class="ac-name">${esc(a.name)}</div>
+      <div class="ac-surface">${esc(surfLabel)}${a.role?' · '+esc(a.role):''}</div>
+      <div class="ac-current">${svg(I.bolt,12)}<span>${esc(a.current||'idle')}</span></div>
+      <div class="ac-meta"><span class="ac-presdot ${presence(a)}">${presence(a)}</span>${joined?` · joined ${joined} ago`:''}</div>
+    </div>
+  </div>`;
+}
+const rowEvent=e=>`<tr><td class="lease" style="color:var(--muted)">${timeAgo(e.at)} ago</td><td>${esc(e.summary)}</td><td><span class="chip">${esc(agent(e.actor)?agent(e.actor).name:e.actor)}</span></td><td><span class="chip tag">${esc(e.kind)}</span></td></tr>`;
+
+function vWorkspace(){
+  const list=FOCUS?S.agents.filter(a=>a.id===FOCUS):S.agents;
+  return `<div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+      <div><h2 class="sec">Workspace</h2><p class="lede" style="margin:0">${FOCUS?'Focused on '+esc(agent(FOCUS).name):'All agents, working in parallel'}</p></div>
+      <div class="spacer"></div>
+      ${FOCUS?`<button class="btn ghost sm" data-act="unfocus">${svg(I.grid,15)} All agents</button>`:''}
+      <button class="btn sm" data-act="autoroute">${svg(I.route,15)} Auto-route backlog</button>
+    </div>
+    <div class="panes stagger">${list.map(paneCard).join('')}</div></div>`;
+}
+function paneCard(a){
+  const task=S.tasks.find(t=>t.owner===a.id&&t.status!=='done');
+  const feed=S.updates.filter(u=>u.agent===a.id).slice(-3).reverse();
+  const prog=task?(task.status==='review'?85:task.status==='in_progress'?52:20):0;
+  return `<div class="card pane">
+    <div class="ph"><div class="av" style="background:${ac(a)}">${initials(a)}<span class="pres ${presence(a)}"></span></div>
+      <div style="flex:1;min-width:0"><div class="nm">${esc(a.name)}</div><div class="rl">${esc(a.role)} · ${a.surface}</div></div>
+      <span class="st ${a.presence==='active'?'done':'todo'}">${a.presence}</span></div>
+    <div class="body">
+      ${task?`<div class="cur"><div class="t">Current task · ${task.id}</div>${esc(task.title)}
+        <div class="barwrap"><div class="bar" style="width:${prog}%"></div></div></div>`
+        :`<div class="cur" style="color:var(--muted)"><div class="t">Idle</div>No active task — available for routing.</div>`}
+      <div style="display:flex;flex-direction:column;gap:7px">
+        ${feed.length?feed.map(u=>`<div class="feeditem"><span class="when">${timeAgo(u.at)}</span><span>${esc(u.message)}</span></div>`).join(''):'<div class="feeditem" style="color:var(--muted)">No recent updates</div>'}
+      </div>
+      <div class="acts">
+        <button class="btn ghost sm" data-act="assign" data-agent="${a.id}">${svg(I.plus,14)} Assign</button>
+        <button class="btn ghost sm" data-act="handoffFrom" data-agent="${a.id}">${svg(I.hand,14)} Handoff</button>
+        <button class="btn ghost sm" data-act="msgTo" data-agent="${a.id}">${svg(I.send,14)} Message</button>
+      </div></div></div>`;
+}
+
+function vTasks(){
+  const rows=[...S.tasks].sort((a,b)=>{
+    let x=a[sortKey],y=b[sortKey];if(typeof x==='string'){x=x.toLowerCase();y=(y||'').toLowerCase();}
+    return (x>y?1:x<y?-1:0)*sortDir;});
+  const th=(k,l)=>`<th data-sort="${k}">${l}${sortKey===k?(sortDir>0?' ↑':' ↓'):''}</th>`;
+  return `<div>
+    <div style="display:flex;align-items:center;margin-bottom:18px">
+      <div><h2 class="sec">Task Queue</h2><p class="lede" style="margin:0">${S.tasks.length} tasks · leases auto-expire so nothing stays stuck</p></div>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" data-act="autoroute">${svg(I.route,15)} Auto-route</button>
+      <button class="btn sm" data-act="addtask" style="margin-left:8px">${svg(I.plus,15)} New task</button>
+    </div>
+    <div class="card"><table><thead><tr>${th('id','ID')}${th('title','Task')}${th('status','Status')}${th('owner','Owner')}<th>Lease</th>${th('tags','Tags')}<th></th></tr></thead>
+    <tbody>${rows.length?rows.map(taskRow).join(''):''}</tbody></table>
+    ${rows.length?'':emptyState('No tasks yet','Add a task and route it to the right agent.')}</div></div>`;
+}
+function taskRow(t){
+  const o=t.owner?agent(t.owner):null;const ll=leaseLeft(t.lease_until);
+  const lc=ll==='expired'?'bad':(ll&&parseInt(ll)<10?'warn':'');
+  return `<tr>
+    <td class="mono" style="color:var(--muted);font-size:12px">${t.id}</td>
+    <td style="font-weight:500">${esc(t.title)}</td>
+    <td><span class="st ${t.status}">${t.status.replace('_',' ')}</span></td>
+    <td>${o?`<span class="chip"><span class="av" style="width:18px;height:18px;font-size:9px;background:${ac(o)}">${initials(o)}</span>${esc(o.name)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+    <td><span class="lease ${lc}">${t.lease_until?(ll==='expired'?'expired':ll):'—'}</span></td>
+    <td>${t.tags.map(x=>`<span class="chip tag">${esc(x)}</span>`).join(' ')}</td>
+    <td style="text-align:right">${t.owner?`<button class="btn ghost sm" data-act="taskdone" data-id="${t.id}">Done</button>`:`<button class="btn ghost sm" data-act="routeone" data-id="${t.id}">${svg(I.route,13)} Route</button>`}</td></tr>`;
+}
+
+function vThreads(){
+  const items=[...S.handoffs.map(h=>({type:'handoff',...h})),...S.messages.map(m=>({type:'message',...m,title:(m.to==='all'?'Broadcast':'DM → '+(agent(m.to)?agent(m.to).name:m.to)),summary:m.body}))]
+    .sort((a,b)=>b.created_at-a.created_at||b.at-a.at);
+  return `<div>
+    <div style="display:flex;align-items:center;margin-bottom:18px">
+      <div><h2 class="sec">Threads</h2><p class="lede" style="margin:0">Handoffs and messages between agents</p></div>
+      <div class="spacer"></div>
+      <button class="btn sm" data-act="newmsg">${svg(I.send,15)} New message</button></div>
+    <div class="card">${items.length?items.map(threadRow).join(''):emptyState('No threads yet','Handoffs and messages will appear here.')}</div></div>`;
+}
+function threadRow(x){
+  const from=agent(x.from);
+  return `<div class="thread" data-act="opnthread" data-id="${x.id}">
+    <div class="tt">${x.type==='handoff'?svg(I.hand,15):svg(I.send,15)} ${esc(x.title)}
+      ${x.status?`<span class="st ${x.status}" style="margin-left:auto">${x.status}</span>`:''}</div>
+    <div class="meta">${esc(from?from.name:x.from)} ${x.type==='handoff'?'→ '+esc(x.to==='any'?'anyone':(agent(x.to)?agent(x.to).name:x.to)):''} · ${timeAgo(x.created_at||x.at)} ago · ${x.id}</div>
+    <div class="prev">${esc(x.summary)}</div></div>`;
+}
+
+function vMemory(){
+  const m=S.memory;
+  return `<div class="stagger">
+    <div><h2 class="sec">Shared Memory & Output Controls</h2><p class="lede">Every agent reads this before acting. Pinned facts + the house style that keeps output consistent.</p></div>
+    <div class="row" style="align-items:flex-start">
+      <div class="card" style="flex:1.3;min-width:0"><div class="pad">
+        <div style="display:flex;align-items:center;margin-bottom:12px"><b style="font-family:var(--font-display);font-size:15px">Pinned context</b>
+          <button class="btn ghost sm" data-act="addpin" style="margin-left:auto">${svg(I.plus,14)} Pin</button></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+        ${m.pinned.map(p=>`<div class="pin">${esc(p.text)}<div class="by">${esc(agent(p.by)?agent(p.by).name:p.by)} · ${timeAgo(p.at)} ago</div></div>`).join('')}
+        </div></div></div>
+      <div class="card" style="flex:1;min-width:0"><div class="pad">
+        <b style="font-family:var(--font-display);font-size:15px">House style</b>
+        <p style="color:var(--muted);font-size:12px;margin:4px 0 14px">Output consistency controls — applied by every agent.</p>
+        <div style="display:flex;flex-direction:column;gap:13px">
+          ${styleField('voice','Voice & tone',m.style.voice)}
+          ${styleField('format','Formatting',m.style.format)}
+          ${styleField('citations','Citations',m.style.citations)}
+          ${styleField('maxlen','Length limits',m.style.maxlen)}
+        </div>
+        <button class="btn sm" data-act="savestyle" style="margin-top:14px">Save house style</button>
+      </div></div>
+    </div></div>`;
+}
+const styleField=(k,l,v)=>`<div class="style-field"><label>${l}</label><input data-style="${k}" value="${esc(v)}"></div>`;
+
+function vLogs(){
+  const ev=[...S.events].reverse();
+  return `<div>
+    <div style="display:flex;align-items:center;margin-bottom:18px">
+      <div><h2 class="sec">Execution Log</h2><p class="lede" style="margin:0">Append-only event stream · source of truth · ${S.events.length} events</p></div>
+      <div class="spacer"></div><span class="chip">${svg(I.bolt,13)} live</span></div>
+    <div class="card"><table><thead><tr><th style="width:60px">Seq</th><th>When</th><th>Event</th><th>Actor</th><th>Type</th></tr></thead>
+    <tbody id="logbody">${ev.map(e=>`<tr><td class="mono" style="color:var(--muted)">#${e.seq}</td><td class="lease" style="color:var(--muted)">${timeAgo(e.at)} ago</td><td>${esc(e.summary)}</td><td><span class="chip">${esc(agent(e.actor)?agent(e.actor).name:e.actor)}</span></td><td><span class="chip tag">${esc(e.kind)}</span></td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+function vSettings(){
+  const s=S.settings;
+  return `<div class="stagger">
+    <div><h2 class="sec">Settings</h2><p class="lede">Workspace, orchestration rules, and appearance.</p></div>
+    <div class="card"><div class="pad">
+      <b style="font-family:var(--font-display);font-size:15px">Workspace</b>
+      <div class="style-field" style="margin-top:12px"><label>Shared workspace path (all surfaces must match)</label>
+        <input value="${esc(s.workspace)}" data-set="workspace"></div>
+      <div style="display:flex;gap:24px;margin-top:16px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer">
+          <input type="checkbox" style="width:auto" ${s.autoroute?'checked':''} data-set="autoroute"> Auto-route new tasks by tag rules</label>
+        <div class="style-field" style="flex:1;min-width:160px"><label>Density</label>
+          <select data-set="density"><option ${s.density==='comfortable'?'selected':''}>comfortable</option><option ${s.density==='compact'?'selected':''}>compact</option></select></div>
+        <div class="style-field" style="flex:1;min-width:160px"><label>Theme</label>
+          <select data-set="theme"><option ${s.theme==='dark'?'selected':''}>dark</option><option ${s.theme==='light'?'selected':''}>light</option></select></div>
+      </div></div></div>
+    <div class="card"><div class="pad">
+      <div style="display:flex;align-items:center;margin-bottom:8px"><b style="font-family:var(--font-display);font-size:15px">Orchestration rules</b>
+        <span style="color:var(--muted);font-size:12px;margin-left:10px">tag → surface</span></div>
+      <table><thead><tr><th>Tag</th><th>Routes to</th><th></th></tr></thead><tbody>
+        ${s.rules.map((r,i)=>`<tr><td><span class="chip tag">${esc(r.tag)}</span></td>
+          <td>${esc(surfaceName(r.surface))}</td>
+          <td style="text-align:right"><button class="btn ghost sm" data-act="delrule" data-i="${i}">Remove</button></td></tr>`).join('')}
+      </tbody></table>
+      <button class="btn ghost sm" data-act="addrule" style="margin-top:12px">${svg(I.plus,14)} Add rule</button></div></div>
+    <div class="card"><div class="pad"><b style="font-family:var(--font-display);font-size:15px;color:var(--bad)">Danger zone</b>
+      <p style="color:var(--muted);font-size:12.5px;margin:6px 0 12px">Clear the room state (demo only — re-seeds on reload).</p>
+      <button class="btn ghost sm" data-act="reset">Reset workspace</button></div></div>
+  </div>`;
+}
+function surfaceName(s){return {claude_code:'Claude Code',cowork:'Claude Co-Pilot',claude_ai:'Claude Chat',design:'Claude Design',chrome:'Claude Browser',claude:'Claude (orchestrator)'}[s]||s;}
+function emptyState(h,p){return `<div class="empty"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg><h4>${h}</h4><div>${p}</div></div>`;}
+
+/* ---------- skeleton ---------- */
+function skeleton(){return `<div class="stagger">
+  <div class="sk" style="height:30px;width:240px"></div><div class="sk" style="height:14px;width:340px;margin-top:8px"></div>
+  <div class="kpigrid" style="margin-top:22px">${[1,2,3,4].map(()=>`<div class="card"><div class="pad"><div class="sk" style="height:12px;width:70px"></div><div class="sk" style="height:34px;width:60px;margin-top:12px"></div></div></div>`).join('')}</div>
+  <div class="card" style="margin-top:6px"><div class="pad">${[1,2,3,4,5].map(()=>`<div class="sk" style="height:16px;margin-bottom:12px"></div>`).join('')}</div></div></div>`;}
+
+/* ---------- main render ---------- */
+const RENDER={overview:vOverview,workspace:vWorkspace,tasks:vTasks,threads:vThreads,memory:vMemory,logs:vLogs,settings:vSettings};
+function render(live){
+  if(!loaded){$('#view').innerHTML=skeleton();return;}
+  $('#vtitle').textContent=VIEWS.find(v=>v.id===VIEW).name;
+  renderNav();renderAgents();renderTicker();
+  const el=$('#view');el.innerHTML=RENDER[VIEW]();
+  // Replay the entrance animation only on real view switches — NOT on live data
+  // refreshes, otherwise the panel visibly flashes every poll.
+  if(!live){ el.classList.remove('view');void el.offsetWidth;el.classList.add('view'); }
+}
+function renderDock(){
+  const m=S.memory;
+  $('#dockbody').innerHTML=`
+    <div><div class="navlabel" style="padding:0 0 8px">Pinned facts</div>
+    ${m.pinned.map(p=>`<div class="pin" style="margin-bottom:9px">${esc(p.text)}<div class="by">${esc(agent(p.by)?agent(p.by).name:p.by)}</div></div>`).join('')}</div>
+    <div><div class="navlabel" style="padding:0 0 8px">House style</div>
+    <div class="pin"><b>Voice</b> · ${esc(m.style.voice)}</div>
+    <div class="pin" style="margin-top:9px"><b>Format</b> · ${esc(m.style.format)}</div>
+    <div class="pin" style="margin-top:9px"><b>Length</b> · ${esc(m.style.maxlen)}</div></div>
+    <button class="btn sm" data-view="memory" data-act="closeall">Open full memory →</button>`;
+}
+
+/* ---------- live tick ---------- */
+function tick(){
+  if(!loaded)return;
+  // lease countdowns
+  $$('#view .lease').forEach(()=>{});
+  if(VIEW==='tasks'){ $$('tbody tr').forEach(tr=>{}); render._softTasks&&render._softTasks(); }
+  // soft-update KPIs + tickers + lease cells without full rerender
+  const k=kpis();
+  $$('[data-kpi]').forEach(el=>el.textContent=k[el.dataset.kpi]);
+  if(VIEW==='tasks'){
+    S.tasks.forEach(t=>{});
+    $$('tbody tr').forEach(tr=>{});
+  }
+  // recompute lease text cells in tasks view
+  if(VIEW==='tasks'){
+    const rows=$$('#view tbody tr');
+  }
+  // simplest: re-render lease cells by re-rendering tasks/overview lightly every few s
+  tickCount++;
+  if(LIVE){ if(tickCount%4===0) refreshLive(); else if(VIEW==='tasks') refreshLeases(); return; }
+  if(VIEW==='tasks') refreshLeases();
+  if(tickCount%8===0) simulate();
+}
+let tickCount=0;
+function refreshLeases(){
+  const tbody=$('#view tbody'); if(!tbody)return;
+  // Only rebuild the table body while a lease is actually counting down; with no
+  // live lease there's nothing to tick, so skip the rebuild and avoid a 1s flicker.
+  if(!S.tasks.some(t=>t.lease_until&&t.lease_until>now()))return;
+  const rows=[...S.tasks].sort((a,b)=>{let x=a[sortKey],y=b[sortKey];if(typeof x==='string'){x=x.toLowerCase();y=(y||'').toLowerCase();}return (x>y?1:x<y?-1:0)*sortDir;});
+  tbody.innerHTML=rows.map(taskRow).join('');
+}
+function simulate(){ if(LIVE)return;
+  // gently advance the room so it feels live (demo only)
+  const acting=S.agents.filter(a=>a.presence==='active'&&a.id!=='claude');
+  const a=acting[Math.floor(Math.random()*acting.length)];if(!a)return;
+  const lines=['reviewing diff','tightened the copy','synced tokens','ran a quick check','left a note on the thread','refined spacing'];
+  const msg=lines[Math.floor(Math.random()*lines.length)];
+  S.updates.push({id:'U-'+(++SEQ),agent:a.id,message:msg,task_id:null,at:now()});
+  S.events.push({seq:++SEQ,kind:'update',actor:a.id,summary:a.name+': '+msg,at:now()});
+  if(VIEW==='logs'||VIEW==='overview'||VIEW==='workspace')render();
+  renderTicker();
+}
+
+/* ---------- actions ---------- */
+function routeTask(t){
+  if(t.owner)return;
+  let surf=null;
+  for(const tag of t.tags){const r=S.settings.rules.find(r=>r.tag===tag);if(r){surf=r.surface;break;}}
+  let cand=S.agents.filter(a=>a.presence!=='left'&&(surf?a.surface===surf:true)&&a.id!=='claude');
+  if(!cand.length)cand=S.agents.filter(a=>a.id!=='claude');
+  cand.sort((x,y)=>x.load-y.load);
+  const a=cand[0];
+  t.owner=a.id;t.status='in_progress';t.lease_until=now()+mins(30);a.load++;a.current=t.id+' · '+t.title;a.presence='active';
+  S.events.push({seq:++SEQ,kind:'route',actor:'claude',summary:`routed ${t.id} → ${a.name}`,at:now()});
+  S.updates.push({id:'U-'+(++SEQ),agent:'claude',message:`Routed ${t.id} to ${a.name}`,task_id:t.id,at:now()});
+  return a;
+}
+const ACT={
+  view:(el)=>{setView(el.dataset.view);},
+  agentfocus:(el)=>{FOCUS=el.dataset.agent;setView('workspace');},
+  unfocus:()=>{FOCUS=null;render();},
+  theme:()=>toggleTheme(),
+  menu:()=>$('#side').classList.toggle('open'),
+  memory:()=>{const d=$('#dock');d.classList.toggle('open');$('#scrim').classList.toggle('on',d.classList.contains('open'));if(d.classList.contains('open'))renderDock();},
+  palette:()=>openPalette(),
+  howtoconnect:()=>toast('Connect another surface',' ','Claude Code / Desktop: wire-local.ps1 or .sh. claude.ai / Design / Chrome: start-web-connector.ps1 or .sh, then add it as a Custom Connector. See CONNECT.md.'),
+  closeall:()=>closeAll(),
+  switchws:()=>toast('Workspace switcher','ok','Demo: one room loaded. Connect more in Settings → Workspace.'),
+  autoroute:()=>{if(LIVE)return commit('route_all');const todo=S.tasks.filter(t=>!t.owner&&t.status==='todo');if(!todo.length){toast('Nothing to route','ok','No unassigned tasks.');return;}todo.forEach(routeTask);render();toast('Backlog routed','ok',`${todo.length} task(s) assigned by tag rules.`);},
+  routeone:(el)=>{if(LIVE)return commit('route_task',{id:el.dataset.id});const t=S.tasks.find(t=>t.id===el.dataset.id);const a=routeTask(t);render();if(a)toast('Task routed','ok',`${t.id} → ${a.name}`);},
+  taskdone:(el)=>{if(LIVE)return commit('task_done',{id:el.dataset.id});const t=S.tasks.find(t=>t.id===el.dataset.id);t.status='done';const a=agent(t.owner);if(a){a.load=Math.max(0,a.load-1);a.current='idle';}t.owner=null;t.lease_until=0;S.events.push({seq:++SEQ,kind:'task_update',actor:'claude',summary:`${t.id} → done`,at:now()});render();toast('Task complete','ok',`${t.id} marked done.`);},
+  addtask:()=>{const title=prompt('Task title');if(!title)return;if(LIVE)return commit('add_task',{title});const id='T-'+String(++SEQ).padStart(4,'0');const t={id,title,status:'todo',owner:null,lease_until:0,tags:[],created_by:'claude',created_at:now()};S.tasks.push(t);S.events.push({seq:++SEQ,kind:'task_add',actor:'claude',summary:`${id} created`,at:now()});if(S.settings.autoroute)routeTask(t);render();toast('Task added','ok',id);},
+  assign:(el)=>{if(LIVE)return commit('assign',{agent:el.dataset.agent});const a=el.dataset.agent;const t=S.tasks.find(x=>!x.owner&&x.status==='todo');if(!t){toast('No open tasks','ok','Backlog is clear.');return;}t.owner=a;t.status='in_progress';t.lease_until=now()+mins(30);agent(a).load++;agent(a).current=t.id+' · '+t.title;S.events.push({seq:++SEQ,kind:'task_claim',actor:a,summary:`${agent(a).name} took ${t.id}`,at:now()});render();toast('Assigned',  'ok',`${t.id} → ${agent(a).name}`);},
+  handoffFrom:(el)=>{if(LIVE){const to=prompt('Hand off to (agent id or any)','any');const title=(to!==null)?prompt('Handoff title'):null;if(title)commit('handoff',{from:el.dataset.agent,to:to,title:title,summary:prompt('Summary / context')||''});return;}toast('Handoff started','ok',`Compose a handoff from ${agent(el.dataset.agent).name} in Threads.`);setView('threads');},
+  msgTo:(el)=>{const body=prompt('Message to '+agent(el.dataset.agent).name);if(!body)return;if(LIVE)return commit('message',{to:el.dataset.agent,body});S.messages.push({id:'M-'+(++SEQ),from:'claude',to:el.dataset.agent,body,at:now()});S.events.push({seq:++SEQ,kind:'message',actor:'claude',summary:`claude → ${agent(el.dataset.agent).name}`,at:now()});render();toast('Message sent','ok');},
+  newmsg:()=>{const body=prompt('Broadcast to all agents');if(!body)return;if(LIVE)return commit('message',{to:'all',body});S.messages.push({id:'M-'+(++SEQ),from:'claude',to:'all',body,at:now()});S.events.push({seq:++SEQ,kind:'message',actor:'claude',summary:'claude → all',at:now()});render();toast('Broadcast sent','ok');},
+  opnthread:(el)=>{const h=S.handoffs.find(x=>x.id===el.dataset.id);if(h){toast('Handoff '+h.id,'ok',h.summary);}},
+  addpin:()=>{const text=prompt('Pin a fact for all agents');if(!text)return;if(LIVE)return commit('pin',{text});S.memory.pinned.unshift({id:'P'+(++SEQ),text,by:'claude',at:now()});render();renderDock();toast('Pinned','ok');},
+  savestyle:()=>{const st={};$$('[data-style]').forEach(i=>st[i.dataset.style]=i.value);if(LIVE)return commit('set_style',{style:st});$$('[data-style]').forEach(i=>S.memory.style[i.dataset.style]=i.value);toast('House style saved','ok','All agents will follow it.');renderDock();},
+  delrule:(el)=>{S.settings.rules.splice(+el.dataset.i,1);if(LIVE)return commit('set_settings',{settings:S.settings});render();},
+  addrule:()=>{const tag=prompt('Tag (e.g. frontend)');if(!tag)return;const surface=prompt('Route to surface id: claude_code, cowork, claude_ai, design, chrome');if(!surface)return;S.settings.rules.push({tag,surface});if(LIVE)return commit('set_settings',{settings:S.settings});render();toast('Rule added','ok');},
+  reset:()=>{if(confirm('Reset the room? (re-seeds on reload)')){boot();toast('Workspace reset','ok');}},
+};
+function setView(v){VIEW=v;FOCUS=(v==='workspace')?FOCUS:null;$('#side').classList.remove('open');render();}
+
+/* ---------- theme / palette / toast ---------- */
+function toggleTheme(){const h=document.documentElement;const d=h.getAttribute('data-theme')==='dark';h.setAttribute('data-theme',d?'light':'dark');
+  $('#themeic').innerHTML=d?'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>':'<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>';
+  if(S)S.settings.theme=d?'light':'dark';}
+function toast(title,kind='',body=''){const t=document.createElement('div');t.className='toast '+kind;
+  t.innerHTML=`<div class="tt">${esc(title)}</div>${body?`<div style="color:var(--muted);font-size:12px">${esc(body)}</div>`:''}`;
+  $('#toasts').appendChild(t);setTimeout(()=>{t.style.transition='.3s';t.style.opacity='0';t.style.transform='translateX(20px)';setTimeout(()=>t.remove(),300);},3200);}
+function closeAll(){$('#dock').classList.remove('open');$('#scrim').classList.remove('on');$('#palette').classList.remove('on');}
+function paletteItems(){const items=[...VIEWS.map(v=>({label:'Go to '+v.name,icon:v.icon,run:()=>setView(v.id)})),
+  ...S.agents.map(a=>({label:'Focus '+a.name,icon:I.panes,run:()=>{FOCUS=a.id;setView('workspace');}})),
+  {label:'Auto-route backlog',icon:I.route,run:()=>ACT.autoroute()},
+  {label:'New task',icon:I.plus,run:()=>ACT.addtask()},
+  {label:'Toggle theme',icon:I.set,run:()=>toggleTheme()},
+  {label:'Open shared memory',icon:I.mem,run:()=>ACT.memory()}];return items;}
+function openPalette(){palSel=0;$('#palette').classList.add('on');$('#scrim').classList.add('on');$('#palinput').value='';renderPalette('');setTimeout(()=>$('#palinput').focus(),30);}
+function renderPalette(q){const items=paletteItems().filter(i=>i.label.toLowerCase().includes(q.toLowerCase()));
+  $('#palresults').innerHTML=items.map((i,n)=>`<div class="res ${n===palSel?'sel':''}" data-pi="${n}">${svg(i.icon,16)}<span>${esc(i.label)}</span>${n===palSel?'<span class="k">↵</span>':''}</div>`).join('')||'<div class="res" style="color:var(--muted)">No matches</div>';
+  $('#palresults')._items=items;}
+/* ---------- events ---------- */
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act],[data-view],[data-agent],[data-sort],[data-pi]');
+  if(!el)return;
+  if(el.dataset.pi!==undefined){const it=$('#palresults')._items[+el.dataset.pi];closeAll();it&&it.run();return;}
+  if(el.dataset.sort){if(sortKey===el.dataset.sort)sortDir*=-1;else{sortKey=el.dataset.sort;sortDir=1;}render();return;}
+  if(el.dataset.act&&ACT[el.dataset.act]){if(el.dataset.view&&el.dataset.act==='closeall'){setView(el.dataset.view);} ACT[el.dataset.act](el);return;}
+  if(el.dataset.view){setView(el.dataset.view);return;}
+  if(el.dataset.agent){ACT.agentfocus(el);return;}
+});
+$('#palinput').addEventListener('input',e=>{palSel=0;renderPalette(e.target.value);});
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();openPalette();return;}
+  if($('#palette').classList.contains('on')){
+    const items=$('#palresults')._items||[];
+    if(e.key==='Escape'){closeAll();}
+    else if(e.key==='ArrowDown'){e.preventDefault();palSel=Math.min(items.length-1,palSel+1);renderPalette($('#palinput').value);}
+    else if(e.key==='ArrowUp'){e.preventDefault();palSel=Math.max(0,palSel-1);renderPalette($('#palinput').value);}
+    else if(e.key==='Enter'){const it=items[palSel];closeAll();it&&it.run();}
+    return;}
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')return;
+  if(e.key==='Escape'){closeAll();}
+  else if(e.key==='t'){toggleTheme();}
+  else if(e.key==='m'){ACT.memory();}
+  else if(e.key==='/'){e.preventDefault();openPalette();}
+  else{const v=VIEWS.find(v=>v.key===e.key);if(v)setView(v.id);}
+});
+
+/* ---------- boot ---------- */
+async function boot(){
+  loaded=false;render();
+  S=await Adapter.load();
+  document.documentElement.setAttribute('data-theme',S.settings.theme);
+  loaded=true;render();
+  setConn(LIVE);
+}
+setInterval(tick,1000);
+boot();
+</script>
+</body>
+</html>
