@@ -252,6 +252,49 @@ Ok "listening on 127.0.0.1:$Port"
    publicUrl = $PublicUrl
    backend   = $Tunnel } | ConvertTo-Json | Set-Content $StateFile
 
+# ------------------------------------------------------------------ dns wait --
+# A freshly minted tunnel hostname is not in public DNS for a few seconds.
+# Querying it too early makes the local resolver cache an NXDOMAIN, and many
+# home routers and ISP resolvers honour that negative entry for minutes — which
+# strands a hostname that is actually live. So confirm the name resolves against
+# a public resolver FIRST, without asking the system resolver and poisoning it.
+$dnsHost = ([uri]$PublicUrl).Host
+Info "Waiting for $dnsHost to appear in public DNS ..."
+$resolved = $false
+for ($i = 0; $i -lt 24; $i++) {
+  try {
+    $r = Resolve-DnsName $dnsHost -Server 1.1.1.1 -ErrorAction Stop -QuickTimeout
+    if ($r) { $resolved = $true; break }
+  } catch { }
+  Start-Sleep -Seconds 2
+}
+if (-not $resolved) {
+  Bad "$dnsHost never appeared in public DNS after ~48s."
+  Hint "The tunnel may not have published. Tear down and retry:  .\start-demo.ps1 -Stop"
+  Stop-Stack; exit 1
+}
+Ok "resolves publicly"
+
+# Now let the local resolver learn it. If it already holds a negative entry from
+# an earlier run, clearing the client cache is what gives it a chance to refetch.
+Clear-DnsClientCache -ErrorAction SilentlyContinue
+$localOk = $false
+for ($i = 0; $i -lt 15; $i++) {
+  try {
+    Resolve-DnsName $dnsHost -ErrorAction Stop -QuickTimeout | Out-Null
+    $localOk = $true; break
+  } catch { Start-Sleep -Seconds 2 }
+}
+if ($localOk) {
+  Ok "resolves locally"
+} else {
+  Bad "resolves publicly but NOT via your local resolver ($dnsHost)."
+  Hint "Your router or ISP resolver is holding a cached NXDOMAIN, or filters this domain."
+  Hint "Options: wait for the negative TTL to expire, switch this machine's DNS to"
+  Hint "1.1.1.1, or use the Tailscale backend instead (-Tunnel tailscale)."
+  Stop-Stack; exit 1
+}
+
 # -------------------------------------------------------------------- verify --
 Write-Host ""
 Info "Verifying the OAuth chain end to end ..."
