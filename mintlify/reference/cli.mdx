@@ -1,0 +1,60 @@
+---
+title: "CLI reference"
+description: "Server flags and helper scripts."
+---
+
+## agora_mcp.py
+
+```bash
+python server/agora_mcp.py [options]
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--workspace` | `~/.agora/default` | Shared workspace dir. **All surfaces must match.** |
+| `--name` | `Agora Workspace` | Display name for the room |
+| `--http` | off | Serve over streamable HTTP instead of stdio |
+| `--host` | `127.0.0.1` | Bind address |
+| `--port` | `8848` | Bind port |
+| `--token` | `$AGORA_TOKEN` | Bearer token, or OAuth consent passphrase |
+| `--oauth` | off | Enable OAuth 2.1 with DCR and PKCE. Requires `--http` and `--public-url` |
+| `--public-url` | `$AGORA_PUBLIC_URL` | The externally reachable URL, no trailing slash |
+
+<Warning>
+The server **refuses to start** if you bind a non-loopback host without a token. Bind `127.0.0.1`
+for local use, or set `AGORA_TOKEN`.
+</Warning>
+
+<Note>
+`--public-url` is not optional cosmetics. It is baked into the OAuth metadata at boot and added to
+the DNS-rebinding allow-list. Without it, requests arriving through a tunnel are rejected with
+`421 Misdirected Request` after OAuth has already succeeded.
+</Note>
+
+## Helper scripts
+
+<CardGroup cols={2}>
+  <Card title="wire-local.ps1 and .sh" icon="plug">
+    Configures your local surfaces to point at one workspace, probing for a Python that can import
+    the dependencies rather than taking the first on PATH.
+  </Card>
+  <Card title="start-demo.ps1" icon="rocket">
+    Brings up tunnel, server and verification in one command. Use `-Tunnel tailscale` or
+    `-Tunnel cloudflared`, and `-Stop` to tear down.
+  </Card>
+  <Card title="verify-connector.ps1" icon="shield-check">
+    Walks the exact OAuth chain a surface walks and names the broken link. Exit code 0 means the
+    URL is safe to hand out.
+  </Card>
+  <Card title="bridge.py" icon="chart-line">
+    Serves the live dashboard from the workspace. Takes `--workspace` and `--port`, default 8849.
+  </Card>
+</CardGroup>
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+28 tests, no dependencies required, because the engine is pure standard library.

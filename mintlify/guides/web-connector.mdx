@@ -1,0 +1,98 @@
+---
+title: "The web connector"
+description: "Expose the room over HTTPS with OAuth 2.1 so browser surfaces can join."
+---
+
+The hosted surfaces — claude.ai web, Chrome and Design — cannot reach `localhost`, and they cannot
+accept a pasted bearer token. They discover OAuth metadata, **self-register** a client
+(RFC 7591 Dynamic Client Registration), then send your browser through an authorization-code + PKCE
+flow.
+
+Agora implements that whole handshake.
+
+## One command
+
+```powershell
+.\start-demo.ps1
+```
+
+It starts a tunnel, boots the server advertising that exact public URL, waits for DNS, then runs
+the full verification and only prints **READY** if every check passes.
+
+<Warning>
+**Ordering is a correctness constraint, not a preference.** The server bakes its public URL into the
+OAuth metadata at boot and cannot learn the hostname afterwards, so the tunnel must exist first.
+`start-demo.ps1` enforces this.
+</Warning>
+
+## Tunnel backends
+
+<Tabs>
+  <Tab title="Tailscale Funnel (stable)">
+    Gives a hostname derived from your machine and tailnet that **survives restarts**, so a Custom
+    Connector added once keeps working.
+
+    ```powershell
+    .\start-demo.ps1 -Tunnel tailscale
+    ```
+
+    Requires two things enabled on your tailnet, which are separate settings:
+
+    1. The `funnel` node attribute in your policy file:
+       ```json
+       "nodeAttrs": [
+         {"target": ["autogroup:member"], "attr": ["funnel"]},
+       ],
+       ```
+    2. **HTTPS certificates** enabled under DNS settings.
+
+    <Note>
+    Tailscale reports the *same* "Funnel is not enabled" message for both. `start-demo.ps1` probes
+    `tailscale cert` to tell them apart and points you at the right page.
+    </Note>
+  </Tab>
+
+  <Tab title="cloudflared (no account)">
+    No account and no domain, but a **new random hostname every run** — every surface must then
+    re-add the connector, not merely re-consent.
+
+    ```powershell
+    .\start-demo.ps1 -Tunnel cloudflared
+    ```
+  </Tab>
+</Tabs>
+
+## Add it to a surface
+
+**Settings → Connectors → Add custom connector**, then paste:
+
+```
+https://<your-public-host>/mcp
+```
+
+It self-registers automatically. Your browser opens a consent page — type the room passphrase once
+to approve.
+
+## Verify before you hand the URL out
+
+```powershell
+.\verify-connector.ps1 -PublicUrl "https://<your-public-host>"
+```
+
+Four checks, in the order a real client performs them:
+
+1. `/mcp` rejects anonymous callers and advertises where to authenticate
+2. The advertised protected-resource document resolves and names the right resource
+3. The authorization server offers DCR and PKCE S256
+4. **Registration actually succeeds**, and authorize redirects to consent
+
+<Note>
+Check 4 exists because a server can *advertise* a registration endpoint that fails on every call.
+Metadata looks perfectly healthy while the connector is unusable.
+</Note>
+
+## Session lifetime
+
+OAuth registrations are held **in memory**. Restarting the server means every surface re-consents —
+it does not mean re-adding the connector, provided the hostname is stable. Start it once and leave
+it up for a demo.

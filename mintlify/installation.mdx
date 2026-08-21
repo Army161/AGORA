@@ -1,0 +1,94 @@
+---
+title: "Installation"
+description: "Per-OS setup for Windows, macOS and Linux."
+---
+
+## Prerequisites
+
+- **Python 3.10 or newer** and `pip`
+- **git**
+
+The coordination engine (`server/store.py`) is pure standard library. Only the MCP wrapper needs
+dependencies — `mcp`, `pydantic`, and for HTTP mode `starlette` and `uvicorn`.
+
+<Tabs>
+  <Tab title="Windows">
+    ```powershell
+    git clone https://github.com/Army161/AGORA.git
+    cd AGORA
+    pip install -r server/requirements.txt
+
+    # run against a shared workspace folder
+    python server\agora_mcp.py --workspace "$env:USERPROFILE\.agora\main"
+    ```
+
+    Or let the wiring script configure your local surfaces for you:
+
+    ```powershell
+    .\wire-local.ps1
+    ```
+
+    <Warning>
+    If you have several Pythons installed, the dependencies must be installed for the **same
+    interpreter** your MCP config points at. `wire-local.ps1` probes for one that can import the
+    dependencies rather than taking the first on PATH.
+    </Warning>
+  </Tab>
+
+  <Tab title="macOS">
+    ```bash
+    git clone https://github.com/Army161/AGORA.git
+    cd AGORA
+    pip install -r server/requirements.txt
+
+    python server/agora_mcp.py --workspace ~/.agora/main
+    ```
+
+    Or run the wiring script:
+
+    ```bash
+    ./wire-local.sh
+    ```
+  </Tab>
+
+  <Tab title="Linux">
+    ```bash
+    git clone https://github.com/Army161/AGORA.git
+    cd AGORA
+    pip install -r server/requirements.txt
+
+    python server/agora_mcp.py --workspace ~/.agora/main
+    ```
+
+    Or run the wiring script:
+
+    ```bash
+    ./wire-local.sh
+    ```
+  </Tab>
+</Tabs>
+
+## Verify the install
+
+The engine has no dependencies, so the test suite runs without installing anything else:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+You should see **28 tests** pass, including the concurrency cases.
+
+## Where the workspace lives
+
+Anywhere you like, as long as every surface agrees. Common choices:
+
+| Platform | Conventional path |
+| --- | --- |
+| Windows | `%USERPROFILE%\.agora\main` |
+| macOS / Linux | `~/.agora/main` |
+| Per-project | `<repo>/.agora` |
+
+<Tip>
+A per-project workspace keeps each codebase's coordination separate, and can be gitignored so the
+room stays local while the code is shared.
+</Tip>

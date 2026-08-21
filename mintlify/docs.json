@@ -1,0 +1,54 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Agora",
+  "description": "A shared room for your AI agents — leased tasks, resource locks, structured handoffs, and one append-only event log.",
+  "colors": {
+    "primary": "#3B5BDB",
+    "light": "#7D95F5",
+    "dark": "#2F49B0"
+  },
+  "favicon": "/images/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["introduction", "quickstart", "installation"]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/workspace",
+              "concepts/leases",
+              "concepts/event-log"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/connect-surfaces",
+              "guides/web-connector",
+              "guides/agent-conventions",
+              "guides/troubleshooting"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": ["reference/tools", "reference/cli", "reference/security"]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [{ "label": "GitHub", "href": "https://github.com/Army161/AGORA" }],
+    "primary": { "type": "button", "label": "Get started", "href": "/quickstart" }
+  },
+  "footer": {
+    "socials": { "github": "https://github.com/Army161/AGORA" }
+  }
+}
