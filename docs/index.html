@@ -20,8 +20,8 @@
 
 <header class="hero"><div class="wrap">
   <span class="eyebrow">Open source · MCP</span>
-  <h1>One room for all your&nbsp;Claude agents.</h1>
-  <p class="lede">Agora is an MCP server that puts every Claude surface — web, Cowork, Claude Code, Chrome, Design — into a single shared workspace, where they claim leased tasks, lock the files they touch, hand work to each other, and read the same append-only event log.</p>
+  <h1>Your second agent has no idea what the first one just&nbsp;did.</h1>
+  <p class="lede">Open Claude Code and Claude Desktop side by side and you have two capable agents that cannot see each other. Both pick up the same task. Both edit the same file. Neither knows. <strong>Agora gives them a room</strong> — one shared workspace where work is claimed, files are locked, and every action is written to a log they all read.</p>
   <div class="btn-row">
     <a class="btn btn-primary" href="install.html">Install in 2 minutes →</a>
     <a class="btn btn-ghost" href="architecture.html">Read the architecture</a>
@@ -29,8 +29,8 @@
 </div></header>
 
 <section><div class="wrap">
-  <h2>The problem</h2>
-  <p class="sub">Every AI surface is single-player. Open Claude Code and Claude Desktop side by side and you have two capable agents that cannot see each other — no shared task list, no idea who is editing which file, no memory of what the other just did. Coordination degrades into copy-pasting context between windows.</p>
+  <h2>Why this isn't a model problem</h2>
+  <p class="sub">A stronger model doesn't stop two agents writing to the same file at the same time — it just does it more confidently. Coordination is a <strong>state</strong> problem: it needs somewhere outside both agents that records who owns what. Today no such place exists, so the human becomes the message bus.</p>
 
   <div class="grid g3">
     <div class="card">
@@ -49,6 +49,31 @@
       <p>Handoffs happen by pasting a wall of text into another chat, losing provenance and history.</p>
     </div>
   </div>
+
+  <p class="mt32">Humans solved this a long time ago, and not with intelligence — with boards, tickets, check-outs and handover docs. Cheap external state anyone can read to find out who owns what. Agora is those primitives, rebuilt with machine-native semantics: <strong>claims that expire on their own</strong>, because agents never notice a stale ticket.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>The moment it matters</h2>
+  <p class="sub">Two agents, one task, no human refereeing. This is the whole product in five calls.</p>
+
+  <div class="table-scroll"><table>
+    <thead><tr><th>Who</th><th>Call</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td><code>Code</code></td><td><code>agora_add_task</code></td><td><code>T-0001</code> lands in the shared pool, visible to everyone.</td></tr>
+      <tr><td><code>Code</code></td><td><code>agora_claim_task</code></td><td>Leased to Code for 30 minutes. Status <code>in_progress</code>.</td></tr>
+      <tr><td><code>Desktop</code></td><td><code>agora_claim_task</code></td><td><strong>Refused</strong> — “owned by Code until 14:32”. Desktop is told <em>why</em>, and goes elsewhere.</td></tr>
+      <tr><td><code>Code</code></td><td><code>agora_create_handoff</code></td><td>Writes <code>handoffs/H-0001.md</code> with context, artifacts and next steps.</td></tr>
+      <tr><td><code>Desktop</code></td><td><code>agora_ack_handoff</code></td><td>Desktop now owns it. The transfer is in the log, with timestamps.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note ok">
+    <p><strong>That refusal is the product.</strong> Without it, Desktop silently starts the same work and one of them overwrites the other. With it, the second agent gets a specific answer — who holds it, and until when — and adapts. No human had to notice.</p>
+  </div>
+
+  <h3>And if Code crashes holding the lease?</h3>
+  <p>Nothing breaks. The lease expires and <code>T-0001</code> returns to the pool automatically, claimable by anyone without a <code>force</code> flag. <strong>Ownership in Agora always has an expiry</strong>, because agents don't file a handover on their way out — they crash, get closed mid-task, or quietly stop.</p>
 </div></section>
 
 <section><div class="wrap">
@@ -207,7 +232,7 @@ python server/agora_mcp.py --workspace ~/.agora/main</code></pre>
 
   <div class="grid g4">
     <div class="stat"><span class="n">19</span><span class="l">MCP tools</span></div>
-    <div class="stat"><span class="n">28</span><span class="l">tests passing</span></div>
+    <div class="stat"><span class="n">52</span><span class="l">tests passing</span></div>
     <div class="stat"><span class="n">3</span><span class="l">operating systems in CI</span></div>
     <div class="stat"><span class="n">0</span><span class="l">dependencies in the engine</span></div>
   </div>

@@ -26,4 +26,4 @@ and no dependencies — it is the fallback that works even when Actions is unava
 a structured tool reference.
 
 Both describe the same software. When you change behaviour, update both — the facts they state
-(19 tools, 28 tests, the lease and encoding semantics) are asserted by CI and by the test suite.
+(19 tools, 52 tests, the lease and encoding semantics) are asserted by CI and by the test suite.
