@@ -221,9 +221,14 @@ server/           canonical MCP server + coordination engine
   bridge.py         serves the live dashboard
 plugin/           self-contained Claude Code plugin (CI enforces it matches server/)
 dashboard/        live web dashboard for watching the room
+billing/          Stripe subscriptions + entitlement layer (built, not yet wired into
+                  agora_join — the OSS path stays unmetered until that's switched on)
 docs/             the documentation site published to GitHub Pages
-tests/            store test suite
+mintlify/         a second docs site (Mintlify) covering the same material
+tests/            store + billing test suite
 wire-local.*      configure local surfaces automatically
+start-web-connector.* configure the OAuth web connector (Design/Chrome/claude.ai)
+verify-connector.ps1  health-check the OAuth chain before a demo
 ```
 
 `plugin/server/` is a deliberate copy so the plugin bundles standalone. A CI job diffs it
