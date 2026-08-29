@@ -39,12 +39,37 @@
 - [x] start-web-connector.sh — starts MCP HTTP server for HTTPS/claude.ai path (portable cd&&pwd)
 - [x] desktop-mcp-config.json — Claude Desktop wiring snippet (Windows python note)
 - [x] PR #1 reviews addressed (Kilo: merge; Augment: 5 findings fixed)
-- [ ] HTTPS run + tunnel/host (user action: expose with cloudflare tunnel or ngrok)
-- [ ] claude.ai custom connector registration (user action: paste HTTPS URL into claude.ai settings)
+- [x] HTTPS run + tunnel/host (cloudflared quick tunnel, verified live end-to-end)
+- [x] claude.ai custom connector registration — superseded by real OAuth 2.1 (DCR + PKCE), not
+      a pasted bearer token; a Custom Connector self-registers and never accepted the token path.
+      Verified: connector reports connected; a cloud Claude Code session joined the room live
+      through the full OAuth chain as agent `code-cloud-1`.
 
 ## Phase 7 — Live cross-surface test
 - [x] Acceptance test script passes locally (store-level): join/claim/refuse/handoff/ack/done + all events
 - [x] wire-local.sh — one command wires Claude Code + Desktop to ONE literal path, verified equal
-- [ ] User runs wire-local.sh on real machine, restarts Desktop, /agora-board in Code
-- [ ] Live two-surface test: claim in one → refused in other → handoff → done (paste result)
-- [ ] Then add claude.ai web (start-web-connector.sh + HTTPS + Custom Connector) for full 5-surface run
+- [x] User ran wire-local.ps1 on the real machine, restarted Desktop, confirmed via agora_board
+- [x] The claim/refuse mutex itself is proven — 8 threads race one task in tests/test_store.py,
+      exactly 1 wins — and a real cross-surface handoff (Code -> Desktop, H-0001, T-0001) shows
+      in the room's actual event log. Not separately re-demoed as a live paste-the-refusal step.
+- [x] claude.ai web joined live via the OAuth connector (code-cloud-1, agora_join verified,
+      persisted to board.md/events.jsonl). Design/Chrome use the identical connector path but
+      weren't separately confirmed joined under those surface names — same mechanism, untested
+      by name.
+
+## Phase 8 — Packaging pass (concurrent, two sessions)
+- [x] Real test suite: tests/test_store.py + tests/test_billing.py, 52 tests (51 pass + 1
+      intentionally-skipped live-key guard), 3 OSes x 2 Python versions in CI
+- [x] CI: asserts exactly 19 agora_* tools registered; diffs plugin/server/ against server/
+- [x] Two documentation sites: docs/ (GitHub Pages) and mintlify/
+- [x] LICENSE (MIT), .gitignore hardening (.remember/, .env*)
+- [x] Fixed a real UTF-8 encoding bug (Windows cp1252 crashed on non-Latin text in updates)
+- [x] Fixed 421 Misdirected Request blocking claude.ai's connection to the tunnel
+- [x] Stripe billing/entitlements scaffold (billing/) — built and tested, deliberately NOT wired
+      into agora_join yet; the OSS path stays unmetered until that's switched on
+- [x] verify-connector.ps1 — health-checks the full OAuth chain before a demo
+- [x] PR #3 merged to main (test suite/CI/docs/OAuth/dashboard redesign, no conflicts)
+- [ ] GitHub Actions CI unblocked — account is "locked due to a billing issue"; raising the
+      spending limit to $5 did not fix it. Needs the account owner to resolve the actual lock
+      (likely a payment-method problem), not just the spend cap.
+- [ ] GitHub Pages enabled (Settings → Pages → Source = GitHub Actions) so docs/ actually deploys

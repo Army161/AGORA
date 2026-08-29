@@ -1,0 +1,76 @@
+---
+title: "Quickstart"
+description: "Get a shared room running and put two surfaces in it."
+---
+
+The coordination engine is pure Python standard library — nothing to compile, and no service to
+host for local use.
+
+<Steps>
+  <Step title="Get the code">
+    ```bash
+    git clone https://github.com/Army161/AGORA.git
+    cd AGORA
+    pip install -r server/requirements.txt
+    ```
+  </Step>
+
+  <Step title="Run the server against a shared workspace">
+    <CodeGroup>
+    ```bash macOS / Linux
+    python server/agora_mcp.py --workspace ~/.agora/main
+    ```
+    ```powershell Windows
+    python server\agora_mcp.py --workspace "$env:USERPROFILE\.agora\main"
+    ```
+    </CodeGroup>
+
+    The first `agora_join` call bootstraps the folder.
+  </Step>
+
+  <Step title="Point every surface at the same workspace">
+    This is the part that matters. Two surfaces on **different** workspace paths are in two
+    different rooms that merely look alike.
+
+    See [Connect your surfaces](/guides/connect-surfaces) for per-surface configuration.
+  </Step>
+
+  <Step title="Verify they share the room">
+    Call `agora_join` then `agora_board` from **two different surfaces**. Both agents must appear
+    in the same board output:
+
+    ```json
+    {
+      "workspace": "Agora",
+      "agents": [
+        { "agent_id": "Code",    "surface": "claude_code", "role": "Builder",    "presence": "active" },
+        { "agent_id": "Desktop", "surface": "cowork",      "role": "Strategist", "presence": "active" }
+      ]
+    }
+    ```
+
+    If each surface only sees itself, they are pointed at different workspace folders.
+  </Step>
+</Steps>
+
+<Warning>
+Two argument names are easy to get wrong from memory:
+
+- `agora_join` takes **`agent_id`** — not `name`
+- `agora_post_update` takes **`message`** — not `summary`
+
+Both schemas use `extra="forbid"`, so a wrong field name fails loudly rather than being ignored.
+</Warning>
+
+## A first coordinated exchange
+
+```
+Agent A: agora_add_task    → T-0001 lands in the shared pool
+Agent A: agora_claim_task  → leased to A, status in_progress
+Agent B: agora_claim_task  → REFUSED, with A's name and the lease expiry
+Agent A: agora_create_handoff → durable doc written to handoffs/H-0001.md
+Agent B: agora_ack_handoff → B now owns it, recorded in the event log
+```
+
+That refusal is the whole product working: B was told *why* it could not proceed, instead of
+silently racing A.

@@ -1,0 +1,61 @@
+---
+title: "Leases and locks"
+description: "Why ownership in Agora always expires."
+---
+
+Ownership is never permanent. A claim on a task and a lock on a file are both **leases** carrying a
+`lease_until` timestamp.
+
+## The check that defines the failure model
+
+```python
+if t["owner"] and t["owner"] != agent_id \
+   and t["lease_until"] > _now() and not force:
+    return {"error": f"task {task_id} is owned by {t['owner']} until "
+                     f"{_iso(t['lease_until'])}. Use force=true to override."}
+```
+
+Read that condition carefully — three properties fall out of it:
+
+<AccordionGroup>
+  <Accordion title="A crashed agent cannot wedge the room">
+    `lease_until > _now()` is the whole failure model. An agent that dies holding a task needs no
+    cleanup: the moment its lease expires, the next claimer succeeds **without** `force`. The worst
+    case of any crash is a delay bounded by the TTL.
+  </Accordion>
+
+  <Accordion title="Re-claiming your own task is safe">
+    The `!= agent_id` guard makes `claim_task` idempotent for the current owner, so a retry after a
+    reconnect does not fail.
+  </Accordion>
+
+  <Accordion title="Stealing is possible but never accidental">
+    `force=true` overrides a live lease. It exists because sometimes a human knows an agent is gone
+    before its lease says so — but it has to be asked for explicitly.
+  </Accordion>
+</AccordionGroup>
+
+## Why this is the important idea
+
+Human coordination tools assume someone eventually notices that a ticket is stale, that a colleague
+left for the day, that a claim was never released.
+
+**Agents do not notice.** They crash, get closed mid-task, or quietly stop. So the primitive has to
+be self-correcting, or a single dead agent halts the room permanently.
+
+## Defaults
+
+| Setting | Value | Meaning |
+| --- | --- | --- |
+| `DEFAULT_LEASE_MINUTES` | 30 | Default TTL for a task claim or resource lock |
+| `PRESENCE_ACTIVE_SECONDS` | 600 | Idle time before an agent shows as `away` |
+| `MUTEX_STALE_SECONDS` | 30 | Age at which a held mutex is presumed abandoned |
+| `MUTEX_TIMEOUT_SECONDS` | 10 | How long a caller waits before raising |
+
+Extend a lease with `agora_update_task` and `extend_minutes` when work legitimately runs long.
+
+<Warning>
+`lease_until` is an absolute timestamp, so leases assume roughly-aligned clocks. Severe skew
+between machines can make a lease look expired to one agent and live to another. On a single
+machine — the common case — this cannot happen.
+</Warning>
