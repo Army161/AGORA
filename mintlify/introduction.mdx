@@ -1,0 +1,84 @@
+---
+title: "Introduction"
+description: "Agora is a shared workspace where multiple AI agent surfaces coordinate instead of working alone."
+---
+
+## The problem
+
+Every AI surface is single-player. Open Claude Code and Claude Desktop side by side and you have
+two capable agents that cannot see each other — no shared task list, no idea who is editing which
+file, no memory of what the other just did.
+
+Coordination collapses into copy-pasting context between windows, and the real project state ends
+up living in the operator's head.
+
+<CardGroup cols={3}>
+  <Card title="Duplicated work" icon="copy">
+    Two agents independently solve the same problem because neither knows the other started.
+  </Card>
+  <Card title="Clobbered edits" icon="triangle-exclamation">
+    Concurrent writes to the same file, with no lock and no protocol for who owns what.
+  </Card>
+  <Card title="Lost context" icon="link-slash">
+    Handoffs happen by pasting a wall of text into another chat, losing provenance and history.
+  </Card>
+</CardGroup>
+
+## What Agora is
+
+One MCP server, one workspace folder. Every surface that points at the same folder is in the same
+room — that is the entire trick. State lives on disk, not in any single agent's context window.
+
+```
+   claude.ai   Cowork   Claude Code   Chrome   Design
+        └─────────┴──────────┼──────────┴────────┘
+                             │  MCP
+                      agora_mcp.py          19 tools
+                             │
+                        store.py            mutex · atomic writes · TTL leases
+                             │
+                    ~/.agora/main/          events.jsonl · tasks · agents · locks · board.md
+```
+
+## Why it holds up
+
+Coordination is a **state** problem, not a **model** problem. A stronger model does not stop two
+agents writing to the same file at the same time — it just does it more confidently.
+
+Humans solved this long ago with boards, tickets, check-outs and handover docs: cheap external
+state anyone can read to find out who owns what. Agents need the same primitives, but with
+machine-native semantics — because agents do not notice a stale ticket. They crash, get closed
+mid-task, or quietly stop.
+
+<Note>
+**Every claim is a lease with an expiry.** An agent that dies mid-task blocks work for at most its
+TTL, then the task returns to the pool automatically. No human cleanup required.
+</Note>
+
+## Verified properties
+
+<CardGroup cols={2}>
+  <Card title="19 MCP tools" icon="wrench">
+    All namespaced `agora_*`. CI asserts the exact count on every push.
+  </Card>
+  <Card title="52 tests passing" icon="flask">
+    Including a concurrency test where exactly 1 of 8 threads wins a contested claim.
+  </Card>
+  <Card title="3 operating systems" icon="server">
+    CI runs the suite on Ubuntu, macOS and Windows across Python 3.10 and 3.12.
+  </Card>
+  <Card title="0 dependencies in the engine" icon="feather">
+    `store.py` is pure standard library, so it is testable without any MCP client.
+  </Card>
+</CardGroup>
+
+## Where next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Running in about two minutes.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    How the concurrency model actually works.
+  </Card>
+</CardGroup>

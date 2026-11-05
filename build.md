@@ -118,3 +118,29 @@
   Detects Python via py/python/python3; uses absolute interpreter path for the
   Desktop command; -Print/-DryRun modes.
 - CONNECT.md: "Fastest path" now shows Windows PowerShell first, then bash; prereqs noted.
+
+## Turn 12 (Claude Code, cloud) — real OAuth web connector + dashboard redesign
+- Built `AgoraOAuthProvider(OAuthAuthorizationServerProvider)` in agora_mcp.py using the mcp
+  SDK's own auth module (mcp.server.auth) rather than hand-rolling: DCR (RFC 7591), PKCE
+  authorize/token/refresh, and a custom /agora/consent route gating issuance behind a
+  passphrase. --oauth + --public-url flags added; start-web-connector.sh/.ps1 rewritten for the
+  tunnel-first ordering OAuth metadata requires. Verified against the live running server: full
+  DCR->authorize->consent->token->authenticated-MCP-call chain, wrong-passphrase rejection,
+  refresh rotation, real agora_join from a "design" surface persisting to board.md/events.jsonl.
+- dashboard/index.html: Overview rebuilt around an "Agents in this room" hero grid
+  (CSS auto-fill(minmax(240px,1fr)), no fixed slot count). bridge.py now surfaces joined_at
+  (store already tracked it, was never exposed). Categorical palette ("--a-coral/-teal/-violet/
+  -amber/-blue/-sage") failed the dataviz skill's validator (chroma floor + CVD separation) —
+  replaced with the validated reference order, re-validated against this app's real panel
+  colors. Fixed avatar-initials contrast (was white text, as low as 2.17:1 on light swatches;
+  now a fixed dark ink, >=3:1 on every swatch). Verified with real Playwright screenshots
+  against a live-seeded 5-agent room, not just code review.
+- Merged with a concurrent session's work (test suite, CI, docs sites, LICENSE, UTF-8 fix,
+  Stripe billing scaffold) via git merge — one conflict (plugin/server/bridge.py drift on the
+  CI-enforced sync check), fixed by copying server/bridge.py forward. PR #3 -> main, merged.
+- Doc pass: fixed docs/pitch.html self-contradicting itself (52 tests in one place, still 25 in
+  another, left over from before the billing test suite landed). Added billing/ and mintlify/
+  to README's repository layout — both existed with zero mention in any top-level doc.
+- Unresolved: GitHub Actions "account is locked due to a billing issue" — every CI job gets
+  runner_id=0, 0 billed ms. Raising the spending limit to $5 did not fix it; a lock appears to
+  be a separate, more severe state (likely a payment-method problem, not a spend cap).

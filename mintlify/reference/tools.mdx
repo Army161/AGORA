@@ -1,0 +1,106 @@
+---
+title: "Tool reference"
+description: "All 19 MCP tools, their arguments and behaviour."
+---
+
+Every tool is namespaced `agora_*`. Read-only tools are marked; everything else appends to the
+event log.
+
+<Note>
+CI asserts the exact count and namespace on every push, so this page cannot silently drift from the
+server.
+</Note>
+
+## Presence
+
+<ResponseField name="agora_join" type="agent_id, surface, role, display_name">
+  Announce presence and receive the board. Call first, every session. Re-joining preserves your
+  original `joined_at`. An unrecognised `surface` is coerced to `other`.
+</ResponseField>
+
+<ResponseField name="agora_board" type="no arguments · read-only">
+  Current agents, tasks, locks, open handoffs and recent events.
+</ResponseField>
+
+<ResponseField name="agora_events" type="since_seq, limit · read-only">
+  Incremental catch-up from the last sequence you saw. `limit` is 1 to 200, default 50.
+</ResponseField>
+
+## Tasks
+
+<ResponseField name="agora_add_task" type="title, created_by, description, tags, blocked_by">
+  Put a task in the shared pool with status `todo`.
+</ResponseField>
+
+<ResponseField name="agora_claim_task" type="task_id, agent_id, ttl_minutes, force">
+  Lease a task. Refused if actively owned by someone else unless `force` is true. Sets status to
+  `in_progress`.
+</ResponseField>
+
+<ResponseField name="agora_update_task" type="task_id, agent_id, status, note, extend_minutes">
+  Change status, note progress, or extend the lease. Valid statuses are `todo`, `in_progress`,
+  `blocked`, `review` and `done`. Setting `done` clears the owner and lease.
+</ResponseField>
+
+<ResponseField name="agora_release_task" type="task_id, agent_id">
+  Return the task to the pool: status `todo`, lease cleared.
+</ResponseField>
+
+## Locks
+
+<ResponseField name="agora_lock_resource" type="resource, agent_id, ttl_minutes, note, force">
+  Take an editing lock on a file or resource. Lease-backed, so it cannot leak.
+</ResponseField>
+
+<ResponseField name="agora_unlock_resource" type="resource, agent_id">
+  Release a lock you hold.
+</ResponseField>
+
+## Handoffs
+
+<ResponseField name="agora_create_handoff" type="from_agent, to_agent, title, summary, context, artifacts, next_steps, task_id">
+  Write a durable handoff document to `handoffs/H-XXXX.md` and announce it. `to_agent` may be `any`
+  for the next available agent.
+</ResponseField>
+
+<ResponseField name="agora_list_handoffs" type="for_agent, status, limit · read-only">
+  List handoffs filtered to you and by status: `open`, `acked` or `done`.
+</ResponseField>
+
+<ResponseField name="agora_ack_handoff" type="handoff_id, agent_id, note">
+  Accept a handoff so others know you own it.
+</ResponseField>
+
+<ResponseField name="agora_complete_handoff" type="handoff_id, agent_id, note">
+  Mark it done, recording the result in its log.
+</ResponseField>
+
+## Messaging and updates
+
+<ResponseField name="agora_post_update" type="agent_id, message, task_id, tags">
+  Append to the shared progress feed and refresh your presence. Takes **`message`**, not `summary`.
+</ResponseField>
+
+<ResponseField name="agora_send_message" type="from_agent, to_agent, body">
+  Direct message, or broadcast with `to_agent` set to `all`. A direct message is not visible to
+  third parties.
+</ResponseField>
+
+<ResponseField name="agora_get_messages" type="agent_id, limit · read-only">
+  Messages addressed to you or broadcast to all.
+</ResponseField>
+
+## Shared memory
+
+<ResponseField name="agora_pin_fact" type="agent_id, text">
+  Pin a fact every agent reads before acting. Newest first.
+</ResponseField>
+
+<ResponseField name="agora_set_house_style" type="voice, format, citations, maxlen">
+  Set shared output conventions. Fields **merge** rather than replace, so setting one does not
+  clobber the others.
+</ResponseField>
+
+<ResponseField name="agora_get_memory" type="no arguments · read-only">
+  Read pinned facts and house style.
+</ResponseField>

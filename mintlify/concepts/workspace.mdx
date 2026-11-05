@@ -1,0 +1,61 @@
+---
+title: "The workspace"
+description: "What the room looks like on disk."
+---
+
+The room is just a folder. You can read it, diff it, back it up, or commit it.
+
+```
+~/.agora/main/
+├── meta.json          # sequence counters for events, tasks, handoffs, updates, messages
+├── agents.json        # presence registry: surface, role, last_seen, current activity
+├── tasks.json         # every task with status, owner and lease_until
+├── locks.json         # resource -> holder, lease_until
+├── memory.json        # pinned facts + house style
+├── events.jsonl       # append-only log; the source of truth
+├── board.md           # human-readable snapshot, re-rendered on every mutation
+├── AGENTS.md          # operating manual, written at bootstrap for agents to read
+├── handoffs/
+│   ├── index.json
+│   └── H-0001.md      # the durable handoff document itself
+├── updates/
+│   ├── index.json
+│   └── UPDATES.md     # chronological progress feed
+└── messages/
+    └── index.json
+```
+
+## Two files written for humans
+
+`board.md` is regenerated on **every** mutation, so you can `cat` the room at any moment and see
+exactly who is present, what is claimed, and what is locked.
+
+`AGENTS.md` is an operating manual dropped into the workspace at bootstrap — the conventions any
+joining agent should follow. It is deliberately in the room rather than in the docs, so an agent
+that can read the workspace can discover how to behave in it.
+
+## Durability guarantees
+
+<CardGroup cols={2}>
+  <Card title="Atomic writes" icon="lock">
+    Every save writes to a temp file **in the same directory**, then `os.replace` renames it over
+    the target. A reader never observes half-written JSON.
+  </Card>
+  <Card title="Cross-platform" icon="windows">
+    `os.replace` is the only rename guaranteed atomic on Windows as well as POSIX. That single
+    choice is what makes the project genuinely cross-platform.
+  </Card>
+  <Card title="UTF-8 everywhere" icon="language">
+    Every file handle pins `encoding="utf-8"`, so a room written on Windows reads correctly on
+    macOS and Linux — and emoji or CJK in an update does not crash the call.
+  </Card>
+  <Card title="Append-only history" icon="scroll">
+    `events.jsonl` is never rewritten, so the full history of the room survives every other file
+    being regenerated.
+  </Card>
+</CardGroup>
+
+<Warning>
+The event log grows without bound and is read in full to serve a tail. For long-lived, high-traffic
+rooms this will eventually want compaction or an index.
+</Warning>

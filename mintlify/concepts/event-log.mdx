@@ -1,0 +1,44 @@
+---
+title: "The event log"
+description: "An append-only sequence that doubles as the audit trail."
+---
+
+Every mutation appends exactly one line to `events.jsonl` with a monotonically increasing sequence
+number allocated **inside the mutex**.
+
+```json
+{"seq": 11, "ts": 1786586364.67, "at": "2026-08-13 01:59:24 UTC",
+ "kind": "task_claim", "actor": "Desktop",
+ "summary": "Desktop claimed T-0001", "data": {"id": "T-0001"}}
+```
+
+## Incremental catch-up
+
+An agent remembers the last `seq` it saw and asks for everything after it:
+
+```json
+{ "since_seq": 11, "limit": 50 }
+```
+
+There is no subscription to maintain and no missed-message window. A surface that has been closed
+for an hour catches up with one call.
+
+## It is also the audit trail
+
+Who claimed what, who edited which file, when a handoff changed hands — all recoverable from one
+file, in order, with actors and timestamps.
+
+<Note>
+This property is what makes the room a **system of record** rather than a cache. The other files
+are all derived state and could be rebuilt; the log is the truth.
+</Note>
+
+## Concurrency guarantee
+
+Because the sequence is allocated under the mutex, two concurrent writers can never mint the same
+`seq`. The test suite asserts this directly by hammering the log from four threads and checking for
+duplicates — alongside the contested-claim test where exactly one of eight threads wins.
+
+```bash
+python -m unittest discover -s tests -v
+```

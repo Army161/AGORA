@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse, hmac, json, os, secrets, time
 from enum import Enum
 from typing import Dict, Optional, List
+from urllib.parse import urlparse
 from pydantic import AnyHttpUrl, BaseModel, Field, ConfigDict
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
@@ -31,6 +32,7 @@ from mcp.server.auth.provider import (
     construct_redirect_uri,
 )
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from store import AgoraStore, DEFAULT_LEASE_MINUTES
 
@@ -477,6 +479,31 @@ def main():
                      f"or bind --host 127.0.0.1 for local-only use.")
         mcp.settings.host = args.host
         mcp.settings.port = args.port
+
+        # DNS-rebinding protection vs. the recommended deployment.
+        #
+        # FastMCP auto-enables DNS rebinding protection whenever it binds a
+        # loopback host, allowing only "127.0.0.1:*"/"localhost:*" in the Host
+        # header. But the correct way to expose this server is exactly that:
+        # bind loopback and let a tunnel (Tailscale Funnel, cloudflared) front
+        # it. Those requests arrive with the PUBLIC hostname in Host, which the
+        # default allow-list rejects with 421 Misdirected Request — after OAuth
+        # has fully succeeded, so the surface reports "authorized, but the
+        # server returned an error" and the real cause is invisible.
+        #
+        # So when a public URL is declared, trust that hostname explicitly. This
+        # widens the allow-list by exactly one name we were told to serve, and
+        # keeps the protection intact for everything else.
+        if args.public_url:
+            public_host = urlparse(args.public_url).netloc
+            mcp.settings.transport_security = TransportSecuritySettings(
+                enable_dns_rebinding_protection=True,
+                allowed_hosts=[public_host, f"{public_host}:*",
+                               "127.0.0.1:*", "localhost:*", "[::1]:*"],
+                allowed_origins=[args.public_url, f"{args.public_url}:*",
+                                 "http://127.0.0.1:*", "http://localhost:*"],
+            )
+
         if args.oauth:
             global _OAUTH_PROVIDER
             provider = AgoraOAuthProvider(passphrase=token, public_url=args.public_url, room_name=args.name)

@@ -1,0 +1,78 @@
+---
+title: "Security"
+description: "What is protected, how, and what is not."
+---
+
+## It refuses to be insecure by accident
+
+In HTTP mode the server will **not start** if you bind a non-loopback interface without a bearer
+token. That is the usual way a local tool gets quietly published to a network.
+
+```python
+if token is None and not _is_loopback(args.host):
+    ap.error("refusing to bind without a token ...")
+```
+
+Tokens are compared with `hmac.compare_digest`, so the check is not timing-attackable.
+
+## OAuth 2.1
+
+The web connector implements a real authorization server: Dynamic Client Registration (RFC 7591),
+the authorization-code flow with **PKCE S256**, and refresh tokens.
+
+Anyone can register a client, which is normal for public MCP connectors. But **nobody obtains an
+authorization code without typing the room passphrase** on the consent page.
+
+<Note>
+Registration is not authorization. Those are deliberately separate steps: the first is automated so
+surfaces can self-configure, the second requires a human who knows the passphrase.
+</Note>
+
+## DNS rebinding protection
+
+The MCP SDK validates the `Host` header and rejects mismatches with `421 Misdirected Request`.
+Agora widens that allow-list by exactly one name: the hostname you declared with `--public-url`.
+
+<Warning>
+This matters because the *recommended* deployment, binding loopback with a tunnel in front, is
+precisely the configuration whose `Host` header the default allow-list rejects. Without declaring
+your public URL, OAuth succeeds and then every subsequent call fails.
+</Warning>
+
+## Threat model, stated plainly
+
+<AccordionGroup>
+  <Accordion title="What the passphrase protects">
+    Access to the room: its tasks, handoffs, messages and pinned facts. Anyone with the passphrase
+    and the URL can join and act as an agent.
+  </Accordion>
+
+  <Accordion title="What it does not protect">
+    Confidentiality in transit is provided by HTTPS at the tunnel, not by the token. Never expose a
+    non-loopback bind without TLS in front of it.
+  </Accordion>
+
+  <Accordion title="Tunnels bypass the loopback guard">
+    Putting a tunnel in front of a `127.0.0.1` bind makes it publicly reachable **without** tripping
+    the non-loopback refusal, because the server still sees a loopback bind. Set a token there too.
+  </Accordion>
+
+  <Accordion title="In-memory OAuth state">
+    Clients, codes and tokens reset on restart. That is deliberate for a local-first tool, but it
+    means a restart forces every surface to re-consent.
+  </Accordion>
+
+  <Accordion title="No per-agent authorization">
+    Every authenticated agent has the same capabilities. There is no read-only role and no
+    per-resource permission model. Treat a room as a single trust boundary.
+  </Accordion>
+</AccordionGroup>
+
+## Secrets hygiene
+
+The workspace folder and `*.crt`, `*.key` and `*.pem` files are gitignored by default.
+
+<Warning>
+`tailscale cert` writes the certificate **and the private key** into the working directory, which
+is often a repository root. The ignore rules exist so that cannot become a commit.
+</Warning>

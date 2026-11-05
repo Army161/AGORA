@@ -29,6 +29,7 @@ function Step($n, $text) { Write-Host ""; Write-Host "[$n] $text" -ForegroundCol
 function Pass($text)     { Write-Host "    PASS  $text" -ForegroundColor Green }
 function Fail($text)     { Write-Host "    FAIL  $text" -ForegroundColor Red;    $script:failures++ }
 function Warn($text)     { Write-Host "    WARN  $text" -ForegroundColor Yellow; $script:warnings++ }
+function Hint($text)     { Write-Host "          $text" -ForegroundColor Yellow }
 
 # Response headers differ by PowerShell edition: 5.1 hands back an
 # HttpWebResponse (indexable), 7+ hands back an HttpResponseMessage (not
@@ -153,6 +154,55 @@ try {
   }
 } catch {
   Fail "could not fetch authorization server metadata: $($_.Exception.Message)"
+}
+
+# -- 4. Registration must actually work, not merely be advertised --
+# Advertising a registration_endpoint that 500s looks healthy in metadata and
+# fails at the first thing a real client does. Exercise it for real.
+Step 4 "Dynamic Client Registration actually succeeds"
+try {
+  $reg = @{
+    client_name                = "agora-verify-probe"
+    redirect_uris              = @("https://claude.ai/api/mcp/auth_callback")
+    grant_types                = @("authorization_code", "refresh_token")
+    response_types             = @("code")
+    token_endpoint_auth_method = "client_secret_post"
+  } | ConvertTo-Json -Compress
+
+  $r = Invoke-WebRequest -Uri "$PublicUrl/register" -Method POST -Body $reg `
+                         -ContentType "application/json" -UseBasicParsing `
+                         -TimeoutSec $TimeoutSec -ErrorAction Stop
+  $client = $r.Content | ConvertFrom-Json
+  if ($client.client_id) {
+    Pass "registered a client (id $($client.client_id.Substring(0,8))...)"
+  } else {
+    Fail "registration returned $($r.StatusCode) but no client_id"
+  }
+
+  # And the authorize leg must hand the browser to a consent page rather than
+  # erroring — that redirect is where the human actually approves access.
+  if ($client.client_id) {
+    $challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"  # PKCE S256 probe value
+    $redir = [uri]::EscapeDataString("https://claude.ai/api/mcp/auth_callback")
+    $authUrl = "$PublicUrl/authorize?response_type=code&client_id=$($client.client_id)" +
+               "&redirect_uri=$redir&code_challenge=$challenge&code_challenge_method=S256&state=probe"
+    try {
+      $a = Invoke-WebRequest -Uri $authUrl -MaximumRedirection 0 -UseBasicParsing `
+                             -TimeoutSec $TimeoutSec -ErrorAction Stop
+      Warn "authorize returned $($a.StatusCode) rather than a redirect to consent"
+    } catch {
+      $ar = $_.Exception.Response
+      $ac = Get-StatusCode $ar
+      $loc = Get-ResponseHeader $ar "Location"
+      if ($ac -ge 300 -and $ac -lt 400 -and $loc) { Pass "authorize redirects to consent" }
+      elseif ($ac) { Fail "authorize returned $ac (expected a redirect)" }
+      else { Fail "authorize failed: $($_.Exception.Message)" }
+    }
+  }
+} catch {
+  $code = Get-StatusCode $_.Exception.Response
+  Fail "registration failed$(if ($code) { " (HTTP $code)" }): $($_.Exception.Message)"
+  Hint "Clients cannot self-register, so claude.ai will not be able to connect."
 }
 
 # -- verdict --

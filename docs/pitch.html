@@ -144,7 +144,7 @@
 
     <div class="grid g4">
       <div class="stat"><span class="n">19</span><span class="l">MCP tools, all namespaced <code>agora_*</code></span></div>
-      <div class="stat"><span class="n">28</span><span class="l">automated tests passing</span></div>
+      <div class="stat"><span class="n">52</span><span class="l">automated tests passing</span></div>
       <div class="stat"><span class="n">3</span><span class="l">operating systems covered in CI</span></div>
       <div class="stat"><span class="n">0</span><span class="l">third-party dependencies in the engine</span></div>
     </div>
@@ -160,7 +160,7 @@
       <li><strong>A concurrency model that is tested, not asserted.</strong> Cross-process mutex via
       atomic directory creation; atomic JSON writes (temp file plus <code>os.replace</code>); an
       append-only event log with a monotonic sequence number; TTL leases on tasks and locks so a
-      crashed agent can never permanently block work. One of the 28 tests puts 8 threads in
+      crashed agent can never permanently block work. One of the 52 tests puts 8 threads in
       competition for a single task claim and asserts that exactly 1 wins.</li>
       <li><strong>Cross-platform CI.</strong> The suite runs on Ubuntu, macOS and Windows across
       Python 3.10 and 3.12, so the file-locking behaviour is proven on three real filesystems
@@ -371,7 +371,7 @@
     <div class="note warn">
       <p><strong>On the placeholders.</strong> Every <code>TODO</code> on this page is unfilled by
       design. No metric here is estimated, illustrative, extrapolated or borrowed from a comparable
-      company. The only numbers stated as fact — 19 tools, 25 passing tests, 3 operating systems in
+      company. The only numbers stated as fact — 19 tools, 52 passing tests, 3 operating systems in
       CI, 0 third-party dependencies in the engine, 1 winner out of 8 competing threads in the
       contested-claim test — are checked against the repository and its continuous integration, and
       anyone can verify all of them from the source. Everything a pitch would normally assert about

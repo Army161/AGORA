@@ -1,6 +1,10 @@
 # Memory — Agora (update every turn)
 
-## Status: Phases 1-6 (local) complete + tested. Remaining: web HTTPS connector + auth + live cross-surface test = Claude Code (HANDOFF.md).
+## Status: All 7 phases complete and merged to main (PR #3). Web connector ships real OAuth 2.1
+(DCR + PKCE), not the bearer-token stub Turn 6 left off on. Dashboard redesigned around a
+scalable agent roster. Docs now ship in three places (docs/ GitHub Pages, mintlify/, this repo's
+top-level .md files) plus a not-yet-wired billing/entitlements layer. Current blocker: GitHub
+Actions is locked on a billing issue unrelated to the code — CI can't get a runner (see Turn 12).
 
 ## Decisions locked
 - Name: **Agora** (renameable). Workspace env: `AGORA_WORKSPACE`.
@@ -101,3 +105,29 @@
 - dashboard: auto-connects to bridge (live) else demo seed; writes route through /act; polls.
 - plugin/server re-vendored. HANDOFF.md created for Claude Code (Phase 6 tail + Phase 7).
 - LEFT FOR CLAUDE CODE: wire real apps, claude.ai web HTTPS connector, auth token, live test.
+
+## Turn 12 — real OAuth, dashboard redesign, packaging pass (Claude Code, cross-surface)
+- The bearer-token web connector from Turn 6 could not satisfy claude.ai's Custom Connector
+  flow (it self-registers via RFC 7591 DCR, then does authorization-code + PKCE). Replaced with
+  a real OAuth 2.1 authorization server using the mcp SDK's own provider protocol: any client
+  self-registers, but nobody gets a token without the room passphrase at /agora/consent.
+  Verified end-to-end live: DCR, PKCE authorize, wrong-passphrase rejection, token exchange,
+  refresh rotation, an authenticated MCP session, a real agora_join persisting to disk.
+- Dashboard redesigned: Overview now leads with a full "Agents in this room" grid (CSS
+  auto-fill, no cap — the "only shows 2 agents" complaint was a layout problem, not a code cap).
+  Categorical agent-surface palette re-picked and run through the dataviz skill's validator
+  after the original hand-picked colors failed contrast/CVD checks.
+- A concurrent session (Claude Opus 5, via the user's Desktop) independently added: a 52-test
+  suite (tests/test_store.py + tests/test_billing.py), 3-OS CI, a GitHub Pages docs site, a
+  mintlify/ docs site, LICENSE, a UTF-8 encoding fix (Windows cp1252 crashed on non-Latin text),
+  a Stripe billing/entitlements layer (built but NOT wired into agora_join — free tier caps at
+  2 agents on paper only), and a fix for 421 Misdirected Request blocking claude.ai's connection.
+  Both lines of work merged cleanly via git merge (no force-push, no discarded work) — PR #3
+  merged to main. All three agents (Code, Desktop, and this cloud session as code-cloud-1)
+  coordinated live in the actual Agora room while doing this, proof the product works on itself.
+- Current blocker: GitHub Actions returns "account is locked due to a billing issue" — every
+  job gets runner_id=0 and 0 billed ms (never allocated a runner), not a test/code failure.
+  Raising the account's Actions spending limit to $5 did NOT clear it — a lock is a different,
+  more severe state than a $0 spending limit (usually a payment-method problem). Unresolved.
+- Workaround already available if CI stays blocked: Settings > Pages > Deploy from a branch
+  publishes docs/ without touching Actions minutes at all.

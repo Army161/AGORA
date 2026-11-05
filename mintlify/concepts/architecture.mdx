@@ -1,0 +1,61 @@
+---
+title: "Architecture"
+description: "The two-file design, and why the split matters."
+---
+
+Agora is about 900 lines of Python with a deliberate split between protocol and logic.
+
+| File | Lines | Responsibility | Dependencies |
+| --- | --- | --- | --- |
+| `server/store.py` | 412 | All coordination logic: presence, tasks, leases, locks, handoffs, messages, memory, the event log, the rendered board | **stdlib only** |
+| `server/agora_mcp.py` | 241 | Thin MCP wrapper. Declares 19 tools, validates input with Pydantic, delegates straight to the store | `mcp`, `pydantic` |
+| `server/bridge.py` | 262 | Serves the live dashboard by reading the workspace | stdlib only |
+
+<Note>
+Because `store.py` imports nothing outside the standard library, the entire coordination engine can
+be tested directly — no MCP client, no network, no mocks. That is what lets the suite meaningfully
+assert on **thread contention** rather than mocking it away.
+</Note>
+
+## Request flow
+
+```
+surface ──MCP──> agora_mcp.py ──> AgoraStore ──> ~/.agora/main/
+                  (validation)     (mutex +        (JSON + JSONL
+                                    leases)         + markdown)
+```
+
+Every mutation follows the same shape:
+
+1. Acquire the cross-process mutex
+2. Read current state
+3. Modify it
+4. Append one line to the event log
+5. Re-render `board.md`
+6. Release the mutex
+
+Steps 1 and 6 make the whole sequence a genuine critical section, which is what allows several OS
+processes to mutate one folder safely.
+
+## Design constraints
+
+<AccordionGroup>
+  <Accordion title="Why a folder, not a database">
+    The room is inspectable with `cat`, diffable, committable to git, and trivially backed up.
+    There is no server to run for local use and no schema migration story. The state is the
+    product's interface, so it should be readable by a human with a text editor.
+  </Accordion>
+
+  <Accordion title="Why the MCP layer holds no logic">
+    Anything in the protocol layer can only be tested through a protocol client. Keeping
+    `agora_mcp.py` a pure delegation layer means the interesting behaviour lives where it can be
+    tested cheaply and exhaustively.
+  </Accordion>
+
+  <Accordion title="Why coordinated rather than simultaneous">
+    Agora is not an operational-transform engine and does not attempt byte-level concurrent editing
+    of one file. Agents claim leased tasks and lock the resources they touch. For autonomous agents
+    that is the correct model — the failure mode of OT under agents is silent semantic corruption,
+    not a merge conflict someone notices.
+  </Accordion>
+</AccordionGroup>
